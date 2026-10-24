@@ -1,0 +1,45 @@
+rules_version = '2';
+
+// Eddembe mobile app. Deploy with: firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+
+    // Each person's saved letters, private to their (anonymous) account.
+    match /users/{uid}/letters/{letterId} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Organisations the team has verified. Written only by server/scripts/import-orgs.ts (Admin SDK).
+    match /support_organisations/{orgId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // Help requests. Only the fields the person agreed to share; they can see their own, nobody else's.
+    // Status changes (seen, contacted, closed) come from the partner side, not the app.
+    match /referrals/{referralId} {
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'sent'
+        && request.resource.data.created_at == request.time
+        && request.resource.data.keys().hasOnly(
+             ['uid', 'organisation_id', 'organisation_name', 'status', 'created_at', 'situation', 'summary', 'phone'])
+        && exists(/databases/$(database)/documents/support_organisations/$(request.resource.data.organisation_id))
+        && get(/databases/$(database)/documents/support_organisations/$(request.resource.data.organisation_id)).data.accepts_referrals == true;
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Anonymous Community Voice answers: the app may add one, never read any. Totals come from the
+    // server (Admin SDK), which only returns counts.
+    match /community_voice/{answerId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['barrier', 'situation', 'district', 'language', 'date'])
+        && request.resource.data.barrier in ['cost', 'distance', 'fear', 'not_knowing_where', 'language', 'other']
+        && request.resource.data.language is string
+        && request.resource.data.date is string;
+      allow read, update, delete: if false;
+    }
+  }
+}

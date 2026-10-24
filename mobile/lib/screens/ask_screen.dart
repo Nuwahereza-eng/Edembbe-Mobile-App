@@ -1,155 +1,94 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../config/languages.dart';
-import '../services/api_client.dart';
+import '../models/results.dart';
+import '../services/app_state.dart';
 import '../widgets/disclaimer_footer.dart';
+import '../widgets/mic_button.dart';
+import '../widgets/settings_action.dart';
+import '../widgets/tr.dart';
 import 'result_screen.dart';
-import 'settings_screen.dart';
 
 class AskScreen extends StatefulWidget {
-  const AskScreen({
-    super.key,
-    required this.language,
-    required this.apiClient,
-    this.onLanguageChanged,
-  });
-
-  final LanguageOption language;
-  final ApiClient apiClient;
-  final Future<void> Function(String languageCode)? onLanguageChanged;
+  const AskScreen({super.key});
 
   @override
   State<AskScreen> createState() => _AskScreenState();
 }
 
 class _AskScreenState extends State<AskScreen> {
-  final TextEditingController _controller = TextEditingController();
-  bool _busy = false;
+  final _controller = TextEditingController();
+  String? _heard;
 
-  Future<void> _ask() async {
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _ask() {
+    final app = context.read<AppState>();
     final question = _controller.text.trim();
-    if (question.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please type a question first.')),
-      );
+    if (question.length < 3) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(app.t('Please type or say your question first.'))));
       return;
     }
-
-    setState(() => _busy = true);
-    try {
-      final result = await widget.apiClient.askQuestion(
-        question,
-        language: widget.language.code,
-      );
-      if (!mounted) return;
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ResultScreen(
-            language: widget.language,
-            result: result,
-            question: question,
-          ),
+    final heard = _heard == question ? _heard : null;
+    FocusScope.of(context).unfocus();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ResultScreen(
+          firstRequest: () async =>
+              Turn.ask(question: question, ask: await app.api.ask(question, language: app.language.code), heard: heard),
         ),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not get an answer: $error')),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final language = context.watch<AppState>().language;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ask'),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => SettingsScreen(
-                    language: widget.language,
-                    onLanguageChanged: widget.onLanguageChanged ?? (_) async {},
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(context.tr('Ask')), actions: const [SettingsAction()]),
       body: SafeArea(
-        child: Padding(
+        child: ListView(
           padding: const EdgeInsets.all(18),
-          child: Column(
-            children: [
-              Expanded(
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Ask about your rights',
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'You are asking in ${widget.language.name}.',
-                          style: const TextStyle(color: Colors.black54),
-                        ),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          child: TextField(
-                            controller: _controller,
-                            maxLines: null,
-                            expands: true,
-                            textAlignVertical: TextAlignVertical.top,
-                            decoration: const InputDecoration(
-                              hintText: 'Type your question about housing, work, land or government information...',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.icon(
-                                onPressed: _busy ? null : _ask,
-                                icon: const Icon(Icons.send),
-                                label: Text(_busy ? 'Checking...' : 'Ask Eddembe'),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            IconButton(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Voice input is not wired yet in this scaffold.')),
-                                );
-                              },
-                              icon: const Icon(Icons.mic_none),
-                              tooltip: 'Voice input',
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+          children: [
+            Text(context.tr('Ask about your rights'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(
+              '${context.tr('Housing, work, land, or information from government.')} (${language.name})',
+              style: const TextStyle(fontSize: 15, color: Colors.black54),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              minLines: 5,
+              maxLines: 10,
+              maxLength: 2000,
+              decoration: InputDecoration(
+                hintText: context.tr('For example: My landlord gave me 7 days to leave. Is that allowed?'),
+                border: const OutlineInputBorder(),
               ),
-              const SizedBox(height: 12),
-              const DisclaimerFooter(),
-            ],
-          ),
+            ),
+            if (_heard != null && _heard == _controller.text)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(context.tr('We heard this. You can correct it before you ask.'),
+                    style: const TextStyle(fontSize: 14, color: Colors.black54)),
+              ),
+            MicButton(
+              onText: (text) => setState(() {
+                _heard = text;
+                _controller.text = text;
+              }),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(onPressed: _ask, icon: const Icon(Icons.send), label: Text(context.tr('Ask Eddembe'))),
+            const SizedBox(height: 20),
+            const DisclaimerFooter(),
+          ],
         ),
       ),
     );

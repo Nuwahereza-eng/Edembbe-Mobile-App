@@ -1,98 +1,79 @@
 import 'package:flutter/material.dart';
 
-import '../config/languages.dart';
 import '../config/situations.dart';
+import '../widgets/settings_action.dart';
+import '../widgets/tr.dart';
+import 'get_help_screen.dart';
 import 'guided_flow_screen.dart';
-import 'settings_screen.dart';
 
 class HomeSituationsScreen extends StatelessWidget {
-  const HomeSituationsScreen({
-    super.key,
-    required this.language,
-    required this.apiClient,
-    this.onLanguageChanged,
-  });
-
-  final LanguageOption language;
-  final dynamic apiClient;
-  final Future<void> Function(String languageCode)? onLanguageChanged;
+  const HomeSituationsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Eddembe'),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => SettingsScreen(
-                    language: language,
-                    onLanguageChanged: onLanguageChanged ?? (_) async {},
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
+        title: const Row(children: [Icon(Icons.balance), SizedBox(width: 8), Text('Eddembe')]),
+        actions: const [SettingsAction()],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GetHelpScreen())),
+        icon: const Icon(Icons.support_agent),
+        label: Text(context.tr('Get help')),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Choose your situation',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Pick the issue most like yours and get a guided answer.',
-                style: TextStyle(color: Colors.black54),
-              ),
-              const SizedBox(height: 18),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: situationOptions.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final situation = situationOptions[index];
-                    return Card(
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(16),
-                        title: Text(
-                          situation.title,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(situation.description),
-                        ),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 18),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => GuidedFlowScreen(
-                                situation: situation,
-                                language: language,
-                                apiClient: apiClient,
-                              ),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 96),
+          children: [
+            Text(context.tr('What is happening?'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(
+              context.tr('Choose what is closest to your situation. We will ask a few simple questions.'),
+              style: const TextStyle(fontSize: 15, color: Colors.black54),
+            ),
+            const SizedBox(height: 16),
+            for (final situation in situationOptions)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Card(
+                  color: Colors.white,
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => GuidedFlowScreen(situation: situation)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 26,
+                            backgroundColor: scheme.primaryContainer,
+                            child: Icon(situation.icon, color: scheme.onPrimaryContainer, size: 28),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(context.tr(situation.title),
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 4),
+                                Text(context.tr(situation.description),
+                                    style: const TextStyle(fontSize: 14, color: Colors.black54)),
+                              ],
                             ),
-                          );
-                        },
+                          ),
+                          const Icon(Icons.chevron_right),
+                        ],
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
