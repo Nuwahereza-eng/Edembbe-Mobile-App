@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'layout.dart';
 import 'tr.dart';
 
-/// Shown while an answer is on its way (10 to 90 seconds, longer for a scan), so the screen never looks frozen.
+/// Shown while an answer is on its way (10 to 90 seconds, longer for a scan): what is happening,
+/// how long it has taken, and skeleton cards, so the screen never looks frozen.
 class LoadingPanel extends StatefulWidget {
   const LoadingPanel({super.key, required this.messages});
 
@@ -33,31 +35,37 @@ class _LoadingPanelState extends State<LoadingPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     // A new message every 8 seconds, staying on the last one.
     final index = (_seconds ~/ 8).clamp(0, widget.messages.length - 1);
-    return Card(
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(context.tr(widget.messages[index]), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
-            const LinearProgressIndicator(minHeight: 6, borderRadius: BorderRadius.all(Radius.circular(3))),
-            const SizedBox(height: 10),
-            Text(
-              '${context.tr('This can take up to a minute or two.')} ${_seconds}s',
-              style: const TextStyle(fontSize: 14, color: Colors.black54),
-            ),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          liveRegion: true,
+          child: Row(
+            children: [
+              const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 3)),
+              const SizedBox(width: 16),
+              Expanded(child: Text(context.tr(widget.messages[index]), style: theme.textTheme.titleMedium)),
+            ],
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+        Text(
+          '${context.tr('This can take up to a minute or two.')} ${_seconds}s',
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: kGap),
+        const SkeletonCard(lines: 5),
+        const SizedBox(height: 8),
+        const SkeletonCard(lines: 2),
+      ],
     );
   }
 }
 
-/// A plain error with a Try again button.
+/// A plain error with a Try again button. Never shows raw errors.
 class ErrorPanel extends StatelessWidget {
   const ErrorPanel({super.key, required this.message, required this.onRetry});
 
@@ -66,15 +74,17 @@ class ErrorPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: const Color(0xFFFCE8E6),
+    final scheme = Theme.of(context).colorScheme;
+    return Card.filled(
+      color: scheme.errorContainer,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(context.tr(message), style: const TextStyle(fontSize: 15)),
-            const SizedBox(height: 12),
+            Text(context.tr(message),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: scheme.onErrorContainer)),
+            const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),

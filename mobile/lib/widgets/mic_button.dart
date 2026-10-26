@@ -65,40 +65,46 @@ class _MicButtonState extends State<MicButton> {
   @override
   Widget build(BuildContext context) {
     final language = context.watch<AppState>().language;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     if (!language.canSpeak) {
-      return Text(context.tr(voiceInputUnavailable), style: const TextStyle(fontSize: 14, color: Colors.black54));
+      return Text(context.tr(voiceInputUnavailable),
+          style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant));
     }
-    final scheme = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          width: 56,
-          height: 56,
-          child: switch (_state) {
-            _MicState.transcribing => const Padding(padding: EdgeInsets.all(14), child: CircularProgressIndicator()),
-            _MicState.recording => IconButton.filled(
-                style: IconButton.styleFrom(backgroundColor: scheme.error),
-                onPressed: _toggle,
-                icon: const Icon(Icons.stop),
-                tooltip: context.tr('Stop recording'),
-              ),
-            _MicState.idle => IconButton.filledTonal(
-                onPressed: _toggle,
-                icon: const Icon(Icons.mic),
-                tooltip: context.tr('Ask by voice'),
-              ),
-          },
-        ),
-        const SizedBox(width: 8),
+        switch (_state) {
+          _MicState.transcribing => const SizedBox.square(
+              dimension: 48,
+              child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 3)),
+            ),
+          _MicState.recording => IconButton.filled(
+              style: IconButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError),
+              iconSize: 28,
+              onPressed: _toggle,
+              icon: const Icon(Icons.stop),
+              tooltip: context.tr('Stop recording'),
+            ),
+          _MicState.idle => IconButton.filledTonal(
+              iconSize: 28,
+              onPressed: _toggle,
+              icon: const Icon(Icons.mic),
+              tooltip: context.tr('Ask by voice'),
+            ),
+        },
+        const SizedBox(width: 12),
         Flexible(
-          child: Text(
-            context.tr(switch (_state) {
-              _MicState.idle => 'Tap to speak',
-              _MicState.recording => 'Listening... tap to stop',
-              _MicState.transcribing => 'Writing down what you said...',
-            }),
-            style: const TextStyle(fontSize: 14),
+          child: Semantics(
+            liveRegion: true,
+            child: Text(
+              context.tr(switch (_state) {
+                _MicState.idle => 'Tap the mic to speak',
+                _MicState.recording => 'Listening... tap to stop',
+                _MicState.transcribing => 'Writing down what you said...',
+              }),
+              style: theme.textTheme.bodyMedium,
+            ),
           ),
         ),
       ],

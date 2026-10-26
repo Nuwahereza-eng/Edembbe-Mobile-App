@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -30,6 +31,7 @@ class AppState extends ChangeNotifier {
   }
 
   static const _languageKey = 'selected_language_code';
+  static const _themeKey = 'theme_mode';
 
   final AuthService auth;
   final ApiClient api;
@@ -49,6 +51,7 @@ class AppState extends ChangeNotifier {
     final state = AppState._(auth);
     final prefs = await SharedPreferences.getInstance();
     state._language = findLanguage(prefs.getString(_languageKey));
+    state._themeMode = ThemeMode.values.asNameMap()[prefs.getString(_themeKey)] ?? ThemeMode.system;
     await state._loadCache();
     return state;
   }
@@ -60,6 +63,17 @@ class AppState extends ChangeNotifier {
     _pending.clear();
     await _loadCache();
     notifyListeners();
+  }
+
+  /// Light, dark, or follow the phone's setting (the default). Chosen in Settings.
+  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode get themeMode => _themeMode;
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeKey, mode.name);
   }
 
   /// Bumped when letters or referrals change, so My cases reloads.

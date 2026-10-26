@@ -54,12 +54,12 @@ class _PlayAnswerButtonState extends State<PlayAnswerButton> {
   @override
   Widget build(BuildContext context) {
     if (!context.watch<AppState>().language.canListen) return const SizedBox.shrink();
-    return OutlinedButton.icon(
+    return FilledButton.tonalIcon(
       onPressed: _loading ? null : _play,
       icon: _loading
-          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+          ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
           : Icon(_playing ? Icons.stop : Icons.volume_up),
-      label: Text(context.tr(_loading ? 'Preparing voice...' : (_playing ? 'Stop' : 'Listen'))),
+      label: Text(context.tr(_loading ? 'Preparing voice...' : (_playing ? 'Stop' : 'Play answer'))),
     );
   }
 }

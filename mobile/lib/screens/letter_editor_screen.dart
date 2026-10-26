@@ -7,6 +7,7 @@ import '../models/records.dart';
 import '../services/api_client.dart';
 import '../services/app_state.dart';
 import '../widgets/disclaimer_footer.dart';
+import '../widgets/layout.dart';
 import '../widgets/loading_panel.dart';
 import '../widgets/tr.dart';
 
@@ -108,7 +109,7 @@ class _LetterEditorScreenState extends State<LetterEditorScreen> {
       ));
       app.casesChanged();
       messenger.showSnackBar(SnackBar(
-        content: Text(app.t(app.letters.syncs ? 'Saved to My cases.' : 'Saved on this phone, in My cases.')),
+        content: Text(app.t(app.letters.syncs ? 'Saved to My cases' : 'Saved on this device, in My cases')),
       ));
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(app.t('Could not save. Please try again.'))));
@@ -121,35 +122,31 @@ class _LetterEditorScreenState extends State<LetterEditorScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(context.tr(_hasLetter ? 'Your letter' : 'Write a letter'))),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(18),
-          children: _hasLetter ? _editor(context) : _form(context),
-        ),
-      ),
+      body: PageBody(maxWidth: 720, children: _hasLetter ? _editor(context) : _form(context)),
     );
   }
 
   List<Widget> _form(BuildContext context) {
+    final theme = Theme.of(context);
     InputDecoration field(String label, [String? hint]) =>
-        InputDecoration(labelText: context.tr(label), hintText: hint == null ? null : context.tr(hint), border: const OutlineInputBorder());
+        InputDecoration(labelText: context.tr(label), hintText: hint == null ? null : context.tr(hint));
     return [
       Text(context.tr('Letters are written in English, which offices use.'),
-          style: const TextStyle(fontSize: 14, color: Colors.black54)),
-      const SizedBox(height: 16),
+          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+      const SizedBox(height: 24),
       DropdownButtonFormField<String>(
         initialValue: _type,
         decoration: field('Type of letter'),
         items: [
           for (final e in letterTypes.entries) DropdownMenuItem(value: e.key, child: Text(context.tr(e.value))),
         ],
-        onChanged: (v) => setState(() => _type = v ?? _type),
+        onChanged: _drafting ? null : (v) => setState(() => _type = v ?? _type),
       ),
-      const SizedBox(height: 14),
+      const SizedBox(height: kGap),
       TextField(controller: _recipient, decoration: field('To', 'For example: Mr. Okello, the landlord')),
-      const SizedBox(height: 14),
+      const SizedBox(height: kGap),
       TextField(controller: _sender, decoration: field('Your name')),
-      const SizedBox(height: 14),
+      const SizedBox(height: kGap),
       TextField(
         controller: _facts,
         minLines: 4,
@@ -157,74 +154,80 @@ class _LetterEditorScreenState extends State<LetterEditorScreen> {
         maxLength: 4000,
         decoration: field('What happened', 'A few sentences about what happened and what you want.'),
       ),
-      if (_error != null) Text(context.tr(_error!), style: const TextStyle(color: Color(0xFFB3261E), fontSize: 14)),
-      const SizedBox(height: 12),
+      if (_error != null)
+        Text(context.tr(_error!), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
+      const SizedBox(height: kGap),
       if (_drafting)
         const LoadingPanel(messages: ['Checking the law...', 'Writing your letter...', 'Checking the sections it cites...'])
       else
-        FilledButton.icon(onPressed: _draft, icon: const Icon(Icons.edit_document), label: Text(context.tr('Write my letter'))),
-      const SizedBox(height: 20),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton.icon(
+            onPressed: _draft,
+            icon: const Icon(Icons.edit_document),
+            label: Text(context.tr('Generate letter')),
+          ),
+        ),
       const DisclaimerFooter(),
     ];
   }
 
   List<Widget> _editor(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return [
       if (_unverified.isNotEmpty)
-        Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: const Color(0xFFFCE8E6), borderRadius: BorderRadius.circular(12)),
-          child: Text(
-            '${context.tr('Please check these references before sending; we could not confirm them:')} ${_unverified.join(', ')}',
-            style: const TextStyle(fontSize: 14),
+        Card.filled(
+          color: scheme.errorContainer,
+          child: ListTile(
+            leading: Icon(Icons.warning_amber_rounded, color: scheme.onErrorContainer),
+            textColor: scheme.onErrorContainer,
+            title: Text(context.tr('Please check these references before sending; we could not confirm them:')),
+            subtitle: Text(_unverified.join(', ')),
           ),
         ),
+      const SizedBox(height: 8),
       TextField(
         controller: _letter,
         minLines: 12,
         maxLines: null,
-        style: const TextStyle(fontSize: 15, height: 1.4),
-        decoration: const InputDecoration(border: OutlineInputBorder()),
+        style: theme.textTheme.bodyLarge,
+        decoration: InputDecoration(labelText: context.tr('Your letter (you can edit it)'), alignLabelWithHint: true),
       ),
       if (_citations.isNotEmpty) ...[
-        const SizedBox(height: 12),
-        Text(context.tr('Law cited in this letter'), style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 6),
-        Wrap(spacing: 6, runSpacing: 6, children: [for (final c in _citations) Chip(label: Text(c))]),
+        SectionTitle(context.tr('Law cited in this letter')),
+        Wrap(spacing: 8, runSpacing: 8, children: [for (final c in _citations) Chip(label: Text(c))]),
       ],
-      const SizedBox(height: 16),
-      Row(
+      const SizedBox(height: 24),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        alignment: WrapAlignment.end,
         children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.copy),
-              label: Text(context.tr('Copy')),
-              onPressed: () async {
-                final app = context.read<AppState>();
-                final messenger = ScaffoldMessenger.of(context);
-                await Clipboard.setData(ClipboardData(text: _letter.text));
-                messenger.showSnackBar(SnackBar(content: Text(app.t('Letter copied.'))));
-              },
-            ),
+          FilledButton.tonalIcon(
+            icon: const Icon(Icons.copy),
+            label: Text(context.tr('Copy')),
+            onPressed: () async {
+              final app = context.read<AppState>();
+              final messenger = ScaffoldMessenger.of(context);
+              await Clipboard.setData(ClipboardData(text: _letter.text));
+              messenger.showSnackBar(SnackBar(content: Text(app.t('Copied'))));
+            },
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.share),
-              label: Text(context.tr('Share')),
-              onPressed: () => SharePlus.instance.share(ShareParams(text: _letter.text, subject: letterTypes[_type])),
-            ),
+          FilledButton.tonalIcon(
+            icon: const Icon(Icons.share),
+            label: Text(context.tr('Share')),
+            onPressed: () => SharePlus.instance.share(ShareParams(text: _letter.text, subject: letterTypes[_type])),
+          ),
+          FilledButton.icon(
+            onPressed: _saving ? null : _save,
+            icon: _saving
+                ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.save),
+            label: Text(context.tr('Save to My cases')),
           ),
         ],
       ),
-      const SizedBox(height: 10),
-      FilledButton.icon(
-        onPressed: _saving ? null : _save,
-        icon: const Icon(Icons.save),
-        label: Text(context.tr('Save to My cases')),
-      ),
-      const SizedBox(height: 20),
       const DisclaimerFooter(),
     ];
   }

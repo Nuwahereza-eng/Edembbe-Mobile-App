@@ -1,6 +1,8 @@
 import 'package:eddembe_mobile/app.dart';
 import 'package:eddembe_mobile/config/situations.dart';
 import 'package:eddembe_mobile/models/results.dart';
+import 'package:eddembe_mobile/screens/guided_flow_screen.dart';
+import 'package:eddembe_mobile/screens/home_situations_screen.dart';
 import 'package:eddembe_mobile/services/app_state.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +18,13 @@ Future<void> pumpApp(WidgetTester tester) async {
   final state = await AppState.load();
   await tester.pumpWidget(ChangeNotifierProvider.value(value: state, child: const EddembeApp()));
   await tester.pump();
+}
+
+/// Lets animations and page transitions finish; unlike pumpAndSettle it also works while a spinner runs.
+Future<void> settle(WidgetTester tester) async {
+  for (var i = 0; i < 10; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
 }
 
 void main() {
@@ -64,5 +73,34 @@ void main() {
     final history = Turn.scan(question: 'Kino kikkirizibwa?', scan: scan).toHistory();
     expect(history['question'], 'I scanned a document. Is this allowed?');
     expect(history['answer'], contains('Extremely short deadline'));
+  });
+
+  testWidgets('every tab and the guided flow fit at 200% text size', (tester) async {
+    SharedPreferences.setMockInitialValues({'selected_language_code': 'eng'});
+    tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.runAsync(() => pumpApp(tester));
+    // Any RenderFlex overflow is reported as a test failure.
+    for (final tab in ['Ask', 'Scan', 'My cases', 'Home']) {
+      await tester.tap(find.text(tab).last);
+      await settle(tester);
+    }
+    // Every tab's list stays alive in the tab stack, so scroll Home's own list.
+    await tester.drag(
+      find.descendant(of: find.byType(HomeSituationsScreen), matching: find.byType(Scrollable)).first,
+      const Offset(0, -300),
+    );
+    await settle(tester);
+    await tester.tap(find.text('My landlord wants me out'));
+    await settle(tester);
+    expect(find.text('What is happening?'), findsOneWidget);
+    await tester.drag(
+      find.descendant(of: find.byType(GuidedFlowScreen), matching: find.byType(Scrollable)).first,
+      const Offset(0, -600),
+    );
+    await settle(tester);
+    await tester.tap(find.text('Next'));
+    await settle(tester);
+    expect(find.text('How do you pay rent?'), findsOneWidget);
   });
 }

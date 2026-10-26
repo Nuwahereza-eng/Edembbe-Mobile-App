@@ -1,44 +1,58 @@
 import 'package:flutter/material.dart';
 
-const Color kGreenPrimary = Color(0xFF1B5E20);
-const Color kAmberSecondary = Color(0xFFF9A825);
-const Color kErrorRed = Color(0xFFB3261E);
-const Color kBackground = Color(0xFFF8F9FA);
-const Color kRedFlag = Color(0xFFFCE8E6);
+// Eddembe's Material 3 theme. Screens use these colour roles and the M3 type scale
+// (Theme.of(context).textTheme), never raw colours or font sizes.
 
-// Material 3 in Eddembe green, Roboto (the Android default). Text at least 14sp, buttons at least 48dp.
-final ThemeData appTheme = ThemeData(
-  useMaterial3: true,
-  fontFamily: 'Roboto',
-  colorScheme: ColorScheme.fromSeed(
-    seedColor: kGreenPrimary,
-    primary: kGreenPrimary,
-    secondary: kAmberSecondary,
-    error: kErrorRed,
-    surface: kBackground,
-  ),
-  scaffoldBackgroundColor: kBackground,
-  appBarTheme: const AppBarTheme(backgroundColor: kBackground, scrolledUnderElevation: 0),
-  textTheme: const TextTheme(
-    bodyLarge: TextStyle(fontSize: 16),
-    bodyMedium: TextStyle(fontSize: 15),
-    bodySmall: TextStyle(fontSize: 14),
-    labelLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-    titleLarge: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-    titleMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-  ),
-  filledButtonTheme: FilledButtonThemeData(
-    style: FilledButton.styleFrom(minimumSize: const Size(48, 52), padding: const EdgeInsets.symmetric(horizontal: 20)),
-  ),
-  outlinedButtonTheme: OutlinedButtonThemeData(
-    style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
-  ),
-  textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(minimumSize: const Size(48, 48))),
-  chipTheme: const ChipThemeData(labelStyle: TextStyle(fontSize: 15)),
-  inputDecorationTheme: const InputDecorationTheme(filled: true, fillColor: Colors.white),
-  cardTheme: CardThemeData(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-    elevation: 0,
-    margin: EdgeInsets.zero,
-  ),
-);
+const Color kBrandGreen = Color(0xFF1B5E20);
+
+/// Amber is only a highlight (for example the Verified badge). It is used through the tertiary
+/// roles, so text on it always uses the matching "on" colour and is never white on amber.
+const Color kBrandAmber = Color(0xFFF9A825);
+
+ColorScheme _scheme(Brightness brightness) {
+  // The fidelity variant keeps the primary close to the brand green instead of a muted tone.
+  final base = ColorScheme.fromSeed(
+    seedColor: kBrandGreen,
+    brightness: brightness,
+    dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+  );
+  final amber = ColorScheme.fromSeed(
+    seedColor: kBrandAmber,
+    brightness: brightness,
+    dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+  );
+  return base.copyWith(
+    tertiary: amber.primary,
+    onTertiary: amber.onPrimary,
+    tertiaryContainer: amber.primaryContainer,
+    onTertiaryContainer: amber.onPrimaryContainer,
+  );
+}
+
+// Touch targets at least 48dp for every button.
+const Size _minButton = Size(64, 48);
+
+ThemeData _theme(Brightness brightness) {
+  final scheme = _scheme(brightness);
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: scheme,
+    fontFamily: 'Roboto',
+    visualDensity: VisualDensity.standard,
+    materialTapTargetSize: MaterialTapTargetSize.padded,
+    appBarTheme: AppBarTheme(
+      backgroundColor: scheme.surface,
+      foregroundColor: scheme.onSurface,
+      scrolledUnderElevation: 3,
+    ),
+    filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: _minButton)),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: _minButton)),
+    textButtonTheme: TextButtonThemeData(style: TextButton.styleFrom(minimumSize: _minButton)),
+    inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
+    snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
+    listTileTheme: const ListTileThemeData(minTileHeight: 56),
+  );
+}
+
+final ThemeData lightTheme = _theme(Brightness.light);
+final ThemeData darkTheme = _theme(Brightness.dark);
