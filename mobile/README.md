@@ -38,21 +38,22 @@ flutter build apk --release --dart-define=API_BASE_URL=... --dart-define=MAPS_EN
 
 ### Firebase (sign-in, letters, referrals, Community Voice)
 
-The app runs without Firebase: letters are then kept on the phone, and referrals and Community Voice are
-switched off. To turn them on, using the team's existing Firebase project:
+Firebase project: **`eddembe-legal-ug`** (display name Eddembe), with an Android app
+(`com.eddembe.eddembe_mobile`) and a Web app. Their settings are in `lib/firebase_options.dart`, passed to
+`Firebase.initializeApp`, so no `google-services.json` or Gradle plugin is needed. These are public client
+identifiers; access is controlled by `firestore.rules`. Firestore runs in `africa-south1` (Johannesburg).
+Authentication uses **Anonymous** sign-in only (no name, phone or email); the app sends the ID token to the API.
 
 ```bash
-dart pub global activate flutterfire_cli
-flutterfire configure            # pick the Eddembe project, Android only
-firebase deploy --only firestore:rules
+firebase deploy --only firestore:rules     # .firebaserc points at eddembe-legal-ug
+# To regenerate the settings after adding a platform:
+flutterfire configure --project=eddembe-legal-ug --platforms=android,web
 ```
 
-`flutterfire configure` adds `android/app/google-services.json` and the Google services Gradle plugin;
-`Firebase.initializeApp()` then finds the project with no code change. In the Firebase console, turn on
-**Authentication → Anonymous**. The app signs in anonymously (no name, phone or email) and sends the ID
-token to the API.
+If Firebase cannot start, the app still works: letters are kept on the device, and referrals and
+Community Voice are switched off.
 
-On the server, set `FIREBASE_PROJECT_ID` (checks the app's tokens) and, on Vercel,
+On the server, set `FIREBASE_PROJECT_ID=eddembe-legal-ug` (checks the app's tokens) and, on Vercel,
 `FIREBASE_SERVICE_ACCOUNT` (reads Community Voice totals). The web app sends no token and is not affected.
 
 Firestore collections:

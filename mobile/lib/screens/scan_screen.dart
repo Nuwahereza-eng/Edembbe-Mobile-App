@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -37,7 +37,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
   final _picker = ImagePicker();
   final _question = TextEditingController();
-  String? _path;
+  Uint8List? _bytes;
   String? _mime;
   String? _name;
   String? _heard;
@@ -51,16 +51,17 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _pickPhoto(ImageSource source) async {
     // Shrunk on the phone to about 1600px on the long side, which Gemma reads well and uploads fast.
     final image = await _picker.pickImage(source: source, maxWidth: 1600, maxHeight: 1600, imageQuality: 82);
-    if (image != null) _setFile(image.path, image.name);
+    if (image != null) _setFile(await image.readAsBytes(), image.name);
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['pdf', 'docx']);
-    final path = result?.files.single.path;
-    if (path != null) _setFile(path, result!.files.single.name);
+    final result =
+        await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['pdf', 'docx'], withData: true);
+    final file = result?.files.single;
+    if (file?.bytes != null) _setFile(file!.bytes!, file.name);
   }
 
-  void _setFile(String path, String name) {
+  void _setFile(Uint8List bytes, String name) {
     final app = context.read<AppState>();
     final ext = name.split('.').last.toLowerCase();
     final mime = _mimeTypes[ext];
@@ -68,12 +69,12 @@ class _ScanScreenState extends State<ScanScreen> {
       _say(app.t('Please choose a photo, a PDF or a Word (.docx) file.'));
       return;
     }
-    if (File(path).lengthSync() > _maxBytes) {
+    if (bytes.length > _maxBytes) {
       _say(app.t('This file is too large. Please take a photo of the page instead.'));
       return;
     }
     setState(() {
-      _path = path;
+      _bytes = bytes;
       _mime = mime;
       _name = name;
     });
@@ -83,7 +84,8 @@ class _ScanScreenState extends State<ScanScreen> {
 
   void _analyze() {
     final app = context.read<AppState>();
-    final path = _path!;
+    final bytes = _bytes!;
+    final name = _name!;
     final mime = _mime!;
     final question = _question.text.trim();
     final heard = _heard != null && _heard == question ? _heard : null;
@@ -94,7 +96,8 @@ class _ScanScreenState extends State<ScanScreen> {
           isScan: true,
           firstRequest: () async {
             final result = await app.api.analyze(
-              filePath: path,
+              bytes: bytes,
+              fileName: name,
               mimeType: mime,
               language: app.language.code,
               question: question.isEmpty ? null : question,
@@ -156,12 +159,12 @@ class _ScanScreenState extends State<ScanScreen> {
                 border: Border.all(color: Colors.black12),
               ),
               clipBehavior: Clip.antiAlias,
-              child: _path == null
+              child: _bytes == null
                   ? Center(
                       child: Text(context.tr('No document chosen yet'), style: const TextStyle(color: Colors.black54)),
                     )
                   : isImage
-                      ? Image.file(File(_path!), fit: BoxFit.contain, width: double.infinity)
+                      ? Image.memory(_bytes!, fit: BoxFit.contain, width: double.infinity)
                       : Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -200,7 +203,7 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
-              onPressed: _path == null ? null : _analyze,
+              onPressed: _bytes == null ? null : _analyze,
               icon: const Icon(Icons.gavel),
               label: Text(context.tr('Check against the law')),
             ),

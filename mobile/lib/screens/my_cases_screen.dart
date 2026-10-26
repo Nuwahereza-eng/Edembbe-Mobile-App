@@ -46,6 +46,8 @@ class _MyCasesScreenState extends State<MyCasesScreen> {
           bottom: TabBar(tabs: [Tab(text: context.tr('Letters')), Tab(text: context.tr('Help requests'))]),
         ),
         floatingActionButton: FloatingActionButton.extended(
+          // Each tab's button needs its own tag: the tabs stay alive side by side in an IndexedStack.
+          heroTag: 'new-letter-fab',
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LetterEditorScreen())),
           icon: const Icon(Icons.add),
           label: Text(context.tr('New letter')),

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:cross_file/cross_file.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
@@ -111,8 +113,10 @@ class ApiClient {
   }
 
   /// POST /api/analyze: a document with an optional typed or spoken question, read against the law.
+  /// The file is sent as bytes, which works the same on a phone and in a browser.
   Future<AnalyzeResult> analyze({
-    required String filePath,
+    required Uint8List bytes,
+    required String fileName,
     required String mimeType,
     required String language,
     String? question,
@@ -120,9 +124,10 @@ class ApiClient {
   }) async {
     final request = http.MultipartRequest('POST', _uri('/api/analyze'))
       ..fields['language'] = language
-      ..files.add(await http.MultipartFile.fromPath(
+      ..files.add(http.MultipartFile.fromBytes(
         mimeType.startsWith('image/') ? 'image' : 'file',
-        filePath,
+        bytes,
+        filename: fileName,
         contentType: MediaType.parse(mimeType),
       ));
     if (question != null && question.trim().isNotEmpty) request.fields['question'] = question.trim();
@@ -139,8 +144,13 @@ class ApiClient {
     return data['text']?.toString() ?? '';
   }
 
-  Future<http.MultipartFile> _audioPart(String path) =>
-      http.MultipartFile.fromPath('audio', path, contentType: MediaType('audio', 'mp4'), filename: 'question.m4a');
+  // On a phone the recording is an .m4a file; in a browser it is a WebM blob URL. XFile reads both.
+  Future<http.MultipartFile> _audioPart(String path) async => http.MultipartFile.fromBytes(
+        'audio',
+        await XFile(path).readAsBytes(),
+        contentType: kIsWeb ? MediaType('audio', 'webm') : MediaType('audio', 'mp4'),
+        filename: kIsWeb ? 'question.webm' : 'question.m4a',
+      );
 
   /// POST /api/speech/tts. Returns audio bytes (WAV).
   Future<Uint8List> speak(String text, {required String language}) {

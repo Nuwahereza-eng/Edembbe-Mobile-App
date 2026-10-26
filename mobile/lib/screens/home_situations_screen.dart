@@ -18,6 +18,8 @@ class HomeSituationsScreen extends StatelessWidget {
         actions: const [SettingsAction()],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        // Each tab's button needs its own tag: the tabs stay alive side by side in an IndexedStack.
+        heroTag: 'get-help-fab',
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GetHelpScreen())),
         icon: const Icon(Icons.support_agent),
         label: Text(context.tr('Get help')),
