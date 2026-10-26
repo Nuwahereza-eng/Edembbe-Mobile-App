@@ -51,6 +51,8 @@ ThemeData _theme(Brightness brightness) {
     inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
     snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
     listTileTheme: const ListTileThemeData(minTileHeight: 56),
+    // Cards line up with the text around them; screens add their own spacing between cards.
+    cardTheme: const CardThemeData(margin: EdgeInsets.zero),
   );
 }
 

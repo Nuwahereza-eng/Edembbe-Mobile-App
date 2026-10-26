@@ -5,7 +5,7 @@ import '../models/results.dart';
 import '../services/app_state.dart';
 import '../widgets/disclaimer_footer.dart';
 import '../widgets/layout.dart';
-import '../widgets/mic_button.dart';
+import '../widgets/message_composer.dart';
 import '../widgets/settings_action.dart';
 import '../widgets/tr.dart';
 import 'result_screen.dart';
@@ -19,6 +19,7 @@ const List<(String, String)> _suggestions = [
   ('Ask government for a document', 'How do I ask a government office for a public document?'),
 ];
 
+/// Suggestions at the top, and a chat-style message bar (text, mic, send) at the bottom.
 class AskScreen extends StatefulWidget {
   const AskScreen({super.key});
 
@@ -45,6 +46,8 @@ class _AskScreenState extends State<AskScreen> {
     }
     final heard = _heard == question ? _heard : null;
     FocusScope.of(context).unfocus();
+    _controller.clear();
+    _heard = null;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -62,61 +65,46 @@ class _AskScreenState extends State<AskScreen> {
     final language = context.watch<AppState>().language;
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('Ask')), actions: const [AppBarActions()]),
-      body: PageBody(
-        maxWidth: 720,
+      // The app shell already moves everything above the keyboard.
+      resizeToAvoidBottomInset: false,
+      body: Column(
         children: [
-          Text(context.tr('Ask about your rights'), style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 8),
-          Text(
-            '${context.tr('Housing, work, land, or information from government.')} (${language.name})',
-            style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 24),
-          TextField(
-            controller: _controller,
-            minLines: 4,
-            maxLines: 10,
-            maxLength: 2000,
-            decoration: InputDecoration(
-              labelText: context.tr('Your question'),
-              hintText: context.tr('Write your question in your own words...'),
-              alignLabelWithHint: true,
-            ),
-          ),
-          if (_heard != null && _heard == _controller.text)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(context.tr('We heard this. You can correct it before you ask.'),
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-            ),
-          MicButton(
-            onText: (text) => setState(() {
-              _heard = text;
-              _controller.text = text;
-            }),
-          ),
-          const SizedBox(height: 24),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(onPressed: _ask, icon: const Icon(Icons.send), label: Text(context.tr('Ask Eddembe'))),
-          ),
-          SectionTitle(context.tr('Try one of these')),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final (label, question) in _suggestions)
-                ActionChip(
-                  avatar: const Icon(Icons.lightbulb_outline),
-                  label: Text(context.tr(label)),
-                  onPressed: () => setState(() {
-                    _heard = null;
-                    _controller.text = context.read<AppState>().t(question);
-                  }),
+          Expanded(
+            child: PageBody(
+              children: [
+                Text(context.tr('Ask about your rights'), style: theme.textTheme.headlineMedium),
+                const SizedBox(height: 8),
+                Text(
+                  '${context.tr('Housing, work, land, or information from government.')} (${language.name})',
+                  style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
-            ],
+                SectionTitle(context.tr('Try one of these')),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final (label, question) in _suggestions)
+                      ActionChip(
+                        avatar: const Icon(Icons.lightbulb_outline),
+                        label: Text(context.tr(label)),
+                        onPressed: () => setState(() {
+                          _heard = null;
+                          _controller.text = context.read<AppState>().t(question);
+                        }),
+                      ),
+                  ],
+                ),
+                const DisclaimerFooter(),
+              ],
+            ),
           ),
-          const DisclaimerFooter(),
+          MessageComposer(
+            controller: _controller,
+            hintText: 'Type your question...',
+            sendTooltip: 'Ask Eddembe',
+            onSend: _ask,
+            onTranscribed: (text) => _heard = text,
+          ),
         ],
       ),
     );

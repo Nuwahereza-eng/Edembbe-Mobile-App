@@ -20,7 +20,8 @@ class AuthService {
     try {
       await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
       final auth = FirebaseAuth.instance;
-      if (auth.currentUser == null) await auth.signInAnonymously();
+      // The splash screen stays up until this finishes, so never wait long (no network on first launch).
+      if (auth.currentUser == null) await auth.signInAnonymously().timeout(const Duration(seconds: 10));
       _available = true;
     } catch (error) {
       debugPrint('Firebase is not available: $error');

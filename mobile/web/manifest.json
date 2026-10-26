@@ -1,11 +1,11 @@
 {
-    "name": "eddembe_mobile",
-    "short_name": "eddembe_mobile",
+    "name": "Eddembe",
+    "short_name": "Eddembe",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1B5E20",
+    "theme_color": "#1B5E20",
+    "description": "Know your rights under Ugandan law: plain answers with the law and section they rely on.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

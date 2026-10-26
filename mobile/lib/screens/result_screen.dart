@@ -10,7 +10,7 @@ import '../widgets/community_voice_card.dart';
 import '../widgets/disclaimer_footer.dart';
 import '../widgets/layout.dart';
 import '../widgets/loading_panel.dart';
-import '../widgets/mic_button.dart';
+import '../widgets/message_composer.dart';
 import '../widgets/play_answer_button.dart';
 import '../widgets/red_flag_tile.dart';
 import '../widgets/tr.dart';
@@ -86,8 +86,11 @@ class _ResultScreenState extends State<ResultScreen> {
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.animateTo(_scroll.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
@@ -110,69 +113,72 @@ class _ResultScreenState extends State<ResultScreen> {
     final letterType = _letterType();
     return Scaffold(
       appBar: AppBar(title: Text(context.tr(widget.isScan ? 'Your document' : 'Your answer'))),
-      body: PageBody(
-        controller: _scroll,
-        maxWidth: expanded ? 1200 : kMaxContentWidth,
+      // Once there is an answer, the follow-up message bar stays at the bottom, like a chat. It is part of
+      // the body (not the bottom bar slot) so it moves up with the keyboard.
+      body: Column(
         children: [
-          for (final turn in _turns) _TurnView(turn: turn, twoPane: expanded),
-          if (busy)
-            LoadingPanel(
-              messages: widget.isScan && _turns.isEmpty
-                  ? const ['Reading your document...', 'Checking the law...', 'Linking problems to the law...', 'Almost done...']
-                  : const ['Understanding your question...', 'Checking the law...', 'Writing a simple answer...', 'Almost done...'],
-            ),
-          if (_error != null) ErrorPanel(message: _error!, onRetry: () => _run(_pending!)),
-          if (_turns.isNotEmpty && !busy) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+          Expanded(
+            child: PageBody(
+              controller: _scroll,
+              maxWidth: expanded ? 1200 : kMaxContentWidth,
               children: [
-                if (letterType != null)
-                  FilledButton.tonalIcon(
-                    icon: const Icon(Icons.edit_document),
-                    label: Text(context.tr('Write a letter')),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => LetterEditorScreen(
-                          letterType: letterType,
-                          facts: _turns.map((t) => t.englishQuestion).join('\n'),
-                        ),
-                      ),
-                    ),
+                for (final turn in _turns) _TurnView(turn: turn, twoPane: expanded),
+                if (busy)
+                  LoadingPanel(
+                    messages: widget.isScan && _turns.isEmpty
+                        ? const [
+                            'Reading your document...',
+                            'Checking the law...',
+                            'Linking problems to the law...',
+                            'Almost done...',
+                          ]
+                        : const [
+                            'Understanding your question...',
+                            'Checking the law...',
+                            'Writing a simple answer...',
+                            'Almost done...',
+                          ],
                   ),
+                if (_error != null) ErrorPanel(message: _error!, onRetry: () => _run(_pending!)),
+                if (_turns.isNotEmpty && !busy) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (letterType != null)
+                        FilledButton.tonalIcon(
+                          icon: const Icon(Icons.edit_document),
+                          label: Text(context.tr('Write a letter')),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LetterEditorScreen(
+                                letterType: letterType,
+                                facts: _turns.map((t) => t.englishQuestion).join('\n'),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: kGap),
+                  GetHelpCard(situationId: widget.situationId, summary: _turns.first.englishQuestion),
+                  const SizedBox(height: kGap),
+                  CommunityVoiceCard(situationId: widget.situationId),
+                ],
+                const DisclaimerFooter(),
               ],
             ),
-            const SizedBox(height: kGap),
-            GetHelpCard(situationId: widget.situationId, summary: _turns.first.englishQuestion),
-            const SizedBox(height: kGap),
-            CommunityVoiceCard(situationId: widget.situationId),
-            SectionTitle(context.tr('Ask a follow-up question')),
-            TextField(
+          ),
+          if (_turns.isNotEmpty && !busy)
+            MessageComposer(
               controller: _followUp,
-              minLines: 1,
-              maxLines: 4,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _askFollowUp(),
-              decoration: InputDecoration(
-                hintText: context.tr('For example: What if I already paid this month?'),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.send),
-                  tooltip: context.tr('Ask follow-up'),
-                  onPressed: _askFollowUp,
-                ),
-              ),
+              hintText: 'Ask a follow-up, e.g. What if I already paid?',
+              sendTooltip: 'Ask follow-up',
+              onSend: _askFollowUp,
+              onTranscribed: (text) => _heard = text,
             ),
-            const SizedBox(height: 12),
-            MicButton(
-              onText: (text) => setState(() {
-                _heard = text;
-                _followUp.text = text;
-              }),
-            ),
-          ],
-          const DisclaimerFooter(),
         ],
       ),
     );
@@ -199,9 +205,15 @@ class _TurnView extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(flex: 3, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: answer)),
+                Expanded(
+                  flex: 3,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: answer),
+                ),
                 const SizedBox(width: 24),
-                Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: law)),
+                Expanded(
+                  flex: 2,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: law),
+                ),
               ],
             )
           else ...[
@@ -232,8 +244,10 @@ class _TurnView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (heard != null)
-              Text(context.tr('We heard:'),
-                  style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSecondaryContainer)),
+              Text(
+                context.tr('We heard:'),
+                style: theme.textTheme.labelMedium?.copyWith(color: scheme.onSecondaryContainer),
+              ),
             Text(question, style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSecondaryContainer)),
           ],
         ),
@@ -290,7 +304,8 @@ class _TurnView extends StatelessWidget {
       ),
       if (scan != null && scan.redFlags.isNotEmpty) ...[
         SectionTitle(context.tr('Red flags')),
-        for (var i = 0; i < scan.redFlags.length; i++) RedFlagTile(text: scan.redFlags[i], sections: scan.sectionsForFlag(i)),
+        for (var i = 0; i < scan.redFlags.length; i++)
+          RedFlagTile(text: scan.redFlags[i], sections: scan.sectionsForFlag(i)),
       ],
       if (scan != null && scan.missingItems.isNotEmpty) ...[
         SectionTitle(context.tr('What is missing')),
@@ -329,12 +344,13 @@ class _TurnView extends StatelessWidget {
     if (turn.citations.isEmpty) return const [];
     return [
       if (!twoPane) SectionTitle(context.tr('The law')) else _paneTitle(context, context.tr('The law')),
-      for (final c in turn.citations) CitationCard(citation: c, explanation: c is RelatedSection ? c.explanation : null),
+      for (final c in turn.citations)
+        CitationCard(citation: c, explanation: c is RelatedSection ? c.explanation : null),
     ];
   }
 
   Widget _paneTitle(BuildContext context, String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Semantics(header: true, child: Text(text, style: Theme.of(context).textTheme.titleMedium)),
-      );
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Semantics(header: true, child: Text(text, style: Theme.of(context).textTheme.titleMedium)),
+  );
 }
