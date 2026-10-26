@@ -306,7 +306,8 @@ class _OrganisationTile extends StatelessWidget {
                       tooltip: '${context.tr('Call')} ${org.phone}',
                       onPressed: () => _open('tel:${org.phone!.replaceAll(' ', '')}'),
                     ),
-                  if (org.email != null)
+                  // Demo organisations have example.org addresses that lead nowhere.
+                  if (org.email != null && !org.demo)
                     IconButton(
                       icon: const Icon(Icons.email_outlined),
                       tooltip: context.tr('Email'),
@@ -322,14 +323,23 @@ class _OrganisationTile extends StatelessWidget {
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Chip(
-                    avatar: Icon(Icons.verified, color: scheme.onTertiaryContainer),
-                    label: Text('${context.tr('Verified on')} ${org.verifiedOn}'),
-                    labelStyle: theme.textTheme.labelMedium?.copyWith(color: scheme.onTertiaryContainer),
-                    backgroundColor: scheme.tertiaryContainer,
-                    side: BorderSide.none,
-                  ),
-                  if (org.sourceUrl.isNotEmpty)
+                  if (org.demo)
+                    Chip(
+                      avatar: Icon(Icons.science_outlined, color: scheme.onSecondaryContainer),
+                      label: Text(context.tr('Demo · not a real organisation')),
+                      labelStyle: theme.textTheme.labelMedium?.copyWith(color: scheme.onSecondaryContainer),
+                      backgroundColor: scheme.secondaryContainer,
+                      side: BorderSide.none,
+                    )
+                  else
+                    Chip(
+                      avatar: Icon(Icons.verified, color: scheme.onTertiaryContainer),
+                      label: Text('${context.tr('Verified on')} ${org.verifiedOn}'),
+                      labelStyle: theme.textTheme.labelMedium?.copyWith(color: scheme.onTertiaryContainer),
+                      backgroundColor: scheme.tertiaryContainer,
+                      side: BorderSide.none,
+                    ),
+                  if (org.sourceUrl.isNotEmpty && !org.demo)
                     TextButton(onPressed: () => _open(org.sourceUrl), child: Text(context.tr('Source'))),
                   if (org.acceptsReferrals)
                     FilledButton.tonalIcon(

@@ -90,6 +90,7 @@ class SupportOrganisation {
     required this.verifiedBy,
     required this.verifiedOn,
     required this.acceptsReferrals,
+    this.demo = false,
     this.phone,
     this.email,
     this.address,
@@ -110,6 +111,7 @@ class SupportOrganisation {
         verifiedBy: j['verified_by']?.toString() ?? '',
         verifiedOn: j['verified_on']?.toString() ?? '',
         acceptsReferrals: j['accepts_referrals'] == true,
+        demo: j['demo'] == true,
       );
 
   final String id;
@@ -125,6 +127,9 @@ class SupportOrganisation {
   final String verifiedBy;
   final String verifiedOn;
   final bool acceptsReferrals;
+
+  /// A made-up organisation for demonstrations (see server/data/demo_support_organisations.csv).
+  final bool demo;
 }
 
 /// A live Google Places search result. Not a verified partner.
@@ -156,4 +161,44 @@ class NearbyPlace {
   final double lng;
   final String? phone;
   final String? mapsUrl;
+}
+
+/// A saved chat: the questions asked (or document scanned) and the answers, to reopen later.
+class SavedConversation {
+  SavedConversation({
+    required this.id,
+    required this.title,
+    required this.isScan,
+    required this.turns,
+    required this.updatedAt,
+    this.situationId,
+  });
+
+  factory SavedConversation.fromJson(String id, Map<String, dynamic> j) => SavedConversation(
+        id: id,
+        title: j['title']?.toString() ?? '',
+        isScan: j['is_scan'] == true,
+        situationId: j['situation']?.toString(),
+        turns: (j['turns'] as List? ?? const []).map((t) => Map<String, dynamic>.from(t as Map)).toList(),
+        updatedAt: _date(j['updated_at']) ?? DateTime.now(),
+      );
+
+  final String id;
+
+  /// The first question, or the document type for a scan.
+  final String title;
+  final bool isScan;
+  final String? situationId;
+
+  /// Each turn as saved by Turn.toJson.
+  final List<Map<String, dynamic>> turns;
+  final DateTime updatedAt;
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'is_scan': isScan,
+        if (situationId != null) 'situation': situationId,
+        'turns': turns,
+        'updated_at': updatedAt.toIso8601String(),
+      };
 }

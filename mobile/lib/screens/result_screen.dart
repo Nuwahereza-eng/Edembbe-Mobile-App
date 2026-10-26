@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../config/situations.dart';
+import '../models/records.dart';
 import '../models/results.dart';
 import '../services/api_client.dart';
 import '../services/app_state.dart';
@@ -19,10 +20,19 @@ import 'letter_editor_screen.dart';
 
 /// One conversation, shared by Ask, Scan and the guided flows: the first answer, then any follow-up
 /// questions, which send the earlier turns as history so the server keeps the context.
+/// Each answer is saved to My cases; a saved conversation can be reopened and continued.
 class ResultScreen extends StatefulWidget {
-  const ResultScreen({super.key, required this.firstRequest, this.situationId, this.isScan = false});
+  const ResultScreen({super.key, required Future<Turn> Function() this.firstRequest, this.situationId, this.isScan = false})
+      : saved = null;
 
-  final Future<Turn> Function() firstRequest;
+  /// Reopens a saved conversation from My cases.
+  ResultScreen.reopen({super.key, required SavedConversation this.saved})
+      : firstRequest = null,
+        situationId = saved.situationId,
+        isScan = saved.isScan;
+
+  final Future<Turn> Function()? firstRequest;
+  final SavedConversation? saved;
   final String? situationId;
   final bool isScan;
 
@@ -38,10 +48,45 @@ class _ResultScreenState extends State<ResultScreen> {
   String? _error;
   String? _heard;
 
+  /// The saved conversation's id, once saved.
+  String _conversationId = '';
+
   @override
   void initState() {
     super.initState();
-    _run(widget.firstRequest);
+    final saved = widget.saved;
+    if (saved != null) {
+      _conversationId = saved.id;
+      for (final t in saved.turns) {
+        try {
+          _turns.add(Turn.fromJson(t));
+        } catch (e) {
+          debugPrint('Skipping a saved turn that could not be read: $e');
+        }
+      }
+    } else {
+      _run(widget.firstRequest!);
+    }
+  }
+
+  /// Saves the conversation to My cases after each answer. A failure only means it is not saved.
+  Future<void> _save() async {
+    final app = context.read<AppState>();
+    final first = _turns.first;
+    final title = first.question.isNotEmpty ? first.question : (first.scan?.documentType ?? '');
+    try {
+      _conversationId = await app.conversations.save(SavedConversation(
+        id: _conversationId,
+        title: title,
+        isScan: widget.isScan,
+        situationId: widget.situationId,
+        turns: [for (final t in _turns) t.toJson()],
+        updatedAt: DateTime.now(),
+      ));
+      app.casesChanged();
+    } catch (e) {
+      debugPrint('Could not save the conversation: $e');
+    }
   }
 
   @override
@@ -63,6 +108,7 @@ class _ResultScreenState extends State<ResultScreen> {
         _turns.add(turn);
         _pending = null;
       });
+      _save();
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
@@ -268,6 +314,22 @@ class _TurnView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (turn.translationFailed) ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ExcludeSemantics(child: Icon(Icons.translate, size: 20, color: scheme.tertiary)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        context.tr('We could not translate this answer right now, so it is shown in English.'),
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
               if (scan != null) ...[
                 Text(scan.documentType, style: theme.textTheme.titleLarge),
                 const SizedBox(height: 8),

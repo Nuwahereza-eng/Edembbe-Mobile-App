@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../app.dart';
 import '../config/situations.dart';
 import '../models/records.dart';
 import '../services/app_state.dart';
@@ -9,6 +10,7 @@ import '../widgets/settings_action.dart';
 import '../widgets/tr.dart';
 import 'get_help_screen.dart';
 import 'letter_editor_screen.dart';
+import 'result_screen.dart';
 
 /// Saved letters and help requests (referrals) with their status.
 class MyCasesScreen extends StatefulWidget {
@@ -22,14 +24,18 @@ class MyCasesScreen extends StatefulWidget {
 }
 
 class _MyCasesScreenState extends State<MyCasesScreen> {
-  Future<(List<SavedLetter>, List<Referral>)>? _data;
+  Future<(List<SavedConversation>, List<SavedLetter>, List<Referral>)>? _data;
   int _seenVersion = -1;
 
-  Future<(List<SavedLetter>, List<Referral>)> _load() async {
+  Future<(List<SavedConversation>, List<SavedLetter>, List<Referral>)> _load() async {
     // Called from build, where context.read is not allowed.
     final app = Provider.of<AppState>(context, listen: false);
-    final results = await Future.wait([app.letters.list(), app.referrals.mine()]);
-    return (results[0] as List<SavedLetter>, results[1] as List<Referral>);
+    final results = await Future.wait([app.conversations.list(), app.letters.list(), app.referrals.mine()]);
+    return (
+      results[0] as List<SavedConversation>,
+      results[1] as List<SavedLetter>,
+      results[2] as List<Referral>,
+    );
   }
 
   void _newLetter() => Navigator.push(context, MaterialPageRoute(builder: (_) => const LetterEditorScreen()));
@@ -42,12 +48,16 @@ class _MyCasesScreenState extends State<MyCasesScreen> {
       _data = _load();
     }
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: Text(context.tr('My cases')),
           actions: const [AppBarActions()],
-          bottom: TabBar(tabs: [Tab(text: context.tr('Letters')), Tab(text: context.tr('Help requests'))]),
+          bottom: TabBar(tabs: [
+            Tab(text: context.tr('Chats')),
+            Tab(text: context.tr('Letters')),
+            Tab(text: context.tr('Help requests')),
+          ]),
         ),
         floatingActionButton: FloatingActionButton.extended(
           heroTag: 'new-letter-fab',
@@ -55,7 +65,7 @@ class _MyCasesScreenState extends State<MyCasesScreen> {
           icon: const Icon(Icons.add),
           label: Text(context.tr('New letter')),
         ),
-        body: FutureBuilder<(List<SavedLetter>, List<Referral>)>(
+        body: FutureBuilder<(List<SavedConversation>, List<SavedLetter>, List<Referral>)>(
           future: _data,
           builder: (context, snap) {
             // Nothing loads until the tab is first opened; no spinner running unseen in the background.
@@ -71,12 +81,82 @@ class _MyCasesScreenState extends State<MyCasesScreen> {
                 ),
               ]);
             }
-            final (letters, referrals) = snap.data!;
-            return TabBarView(children: [_letters(context, letters), _referrals(context, referrals)]);
+            final (chats, letters, referrals) = snap.data!;
+            return TabBarView(
+              children: [_chats(context, chats), _letters(context, letters), _referrals(context, referrals)],
+            );
           },
         ),
       ),
     );
+  }
+
+  Widget _chats(BuildContext context, List<SavedConversation> chats) {
+    final theme = Theme.of(context);
+    return RefreshIndicator(
+      onRefresh: () async => setState(() => _data = _load()),
+      child: PageBody(
+        maxWidth: 720,
+        children: chats.isEmpty
+            ? [
+                EmptyState(
+                  icon: Icons.chat_outlined,
+                  message: context.tr('Your questions and scanned documents will appear here.'),
+                  actionLabel: context.tr('Ask a question'),
+                  onAction: () => MainShell.showTab(context, 1),
+                ),
+              ]
+            : [
+                const SizedBox(height: 8),
+                for (final chat in chats)
+                  Card.outlined(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: Icon(chat.isScan ? Icons.document_scanner_outlined : Icons.chat_outlined),
+                      title: Text(chat.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(
+                        [
+                          _day(chat.updatedAt),
+                          if (chat.turns.length > 1) '${chat.turns.length} ${context.tr('answers')}',
+                        ].join(' · '),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: context.tr('Delete chat'),
+                        onPressed: () => _deleteChat(chat),
+                      ),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => ResultScreen.reopen(saved: chat)),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 80),
+              ],
+      ),
+    );
+  }
+
+  Future<void> _deleteChat(SavedConversation chat) async {
+    final app = context.read<AppState>();
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        icon: const Icon(Icons.delete_outline),
+        title: Text(app.t('Delete this chat?')),
+        content: Text(app.t('You cannot undo this.')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(app.t('Keep chat'))),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(app.t('Delete'))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await app.conversations.delete(chat.id);
+    app.casesChanged();
+    messenger.showSnackBar(SnackBar(content: Text(app.t('Chat deleted.'))));
   }
 
   Widget _letters(BuildContext context, List<SavedLetter> letters) {

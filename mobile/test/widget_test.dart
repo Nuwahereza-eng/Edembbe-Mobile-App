@@ -103,4 +103,24 @@ void main() {
     await settle(tester);
     expect(find.text('How do you pay rent?'), findsOneWidget);
   });
+
+  test('a saved chat turn comes back the same', () {
+    final ask = AskResult.fromJson({
+      'answer': 'Owner wa nnyumba alina okukuwa ennaku 30.',
+      'answer_en': 'Your landlord must give you 30 days.',
+      'next_steps': ['Kebera endagaano yo.'],
+      'next_steps_en': ['Check your agreement.'],
+      'citations': [
+        {'law_name': 'Landlord and Tenant Act, 2022', 'section_number': '38', 'excerpt': 'thirty days'},
+      ],
+      'confidence': 'high',
+    });
+    final saved = Turn.ask(question: 'Kiki?', ask: ask, heard: 'Kiki?', questionEn: 'What?').toJson();
+    final back = Turn.fromJson(saved);
+    expect(back.question, 'Kiki?');
+    expect(back.heard, 'Kiki?');
+    expect(back.ask!.answer, ask.answer);
+    expect(back.citations.single.sectionNumber, '38');
+    expect(back.toHistory(), {'question': 'What?', 'answer': 'Your landlord must give you 30 days.'});
+  });
 }
