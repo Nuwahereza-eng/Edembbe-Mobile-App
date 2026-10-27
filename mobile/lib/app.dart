@@ -8,6 +8,7 @@ import 'screens/my_cases_screen.dart';
 import 'screens/scan_screen.dart';
 import 'services/app_state.dart';
 import 'theme.dart';
+import 'widgets/layout.dart';
 import 'widgets/tr.dart';
 
 class EddembeApp extends StatelessWidget {
@@ -15,17 +16,21 @@ class EddembeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The language is picked once on first launch and changed later in Settings.
+    // The language is picked once on first launch and changed later from the top bar or Settings.
     final hasLanguage = context.select<AppState, bool>((s) => s.chosenLanguage != null);
+    final themeMode = context.select<AppState, ThemeMode>((s) => s.themeMode);
     return MaterialApp(
       title: 'Eddembe',
-      theme: appTheme,
+      theme: lightTheme,
+      darkTheme: darkTheme,
+      themeMode: themeMode,
       debugShowCheckedModeBanner: false,
-      home: hasLanguage ? const MainShell() : const LanguagePickerScreen(firstLaunch: true),
+      home: hasLanguage ? const MainShell() : const LanguagePickerScreen(),
     );
   }
 }
 
+/// The four destinations: a bottom navigation bar on phones, a navigation rail on wider screens.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -46,32 +51,57 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final destinations = [
+      (Icons.home_outlined, Icons.home, context.tr('Home')),
+      (Icons.chat_outlined, Icons.chat, context.tr('Ask')),
+      (Icons.document_scanner_outlined, Icons.document_scanner, context.tr('Scan')),
+      (Icons.folder_outlined, Icons.folder, context.tr('My cases')),
+    ];
+    final body = IndexedStack(
+      index: _index,
+      children: [
+        const HomeSituationsScreen(),
+        const AskScreen(),
+        const ScanScreen(),
+        MyCasesScreen(visible: _index == MainShell.myCasesTab),
+      ],
+    );
+
+    if (windowClassOf(context) == WindowClass.compact) {
+      return Scaffold(
+        body: body,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: _select,
+          destinations: [
+            for (final (icon, selected, label) in destinations)
+              NavigationDestination(icon: Icon(icon), selectedIcon: Icon(selected), label: label),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
-      body: IndexedStack(
-        index: _index,
+      body: Row(
         children: [
-          const HomeSituationsScreen(),
-          const AskScreen(),
-          const ScanScreen(),
-          MyCasesScreen(visible: _index == MainShell.myCasesTab),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: _select,
-        destinations: [
-          NavigationDestination(
-              icon: const Icon(Icons.home_outlined), selectedIcon: const Icon(Icons.home), label: context.tr('Home')),
-          NavigationDestination(
-              icon: const Icon(Icons.chat_outlined), selectedIcon: const Icon(Icons.chat), label: context.tr('Ask')),
-          NavigationDestination(
-              icon: const Icon(Icons.document_scanner_outlined),
-              selectedIcon: const Icon(Icons.document_scanner),
-              label: context.tr('Scan')),
-          NavigationDestination(
-              icon: const Icon(Icons.folder_outlined),
-              selectedIcon: const Icon(Icons.folder),
-              label: context.tr('My cases')),
+          SafeArea(
+            child: NavigationRail(
+              selectedIndex: _index,
+              onDestinationSelected: _select,
+              labelType: NavigationRailLabelType.all,
+              groupAlignment: -0.85,
+              leading: Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 16),
+                child: Icon(Icons.balance, size: 32, color: Theme.of(context).colorScheme.primary, semanticLabel: 'Eddembe'),
+              ),
+              destinations: [
+                for (final (icon, selected, label) in destinations)
+                  NavigationRailDestination(icon: Icon(icon), selectedIcon: Icon(selected), label: Text(label)),
+              ],
+            ),
+          ),
+          const VerticalDivider(width: 1),
+          Expanded(child: body),
         ],
       ),
     );

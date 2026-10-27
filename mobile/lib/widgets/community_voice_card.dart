@@ -28,6 +28,8 @@ class CommunityVoiceCard extends StatefulWidget {
 class _CommunityVoiceCardState extends State<CommunityVoiceCard> {
   bool _hidden = false;
   bool _sent = false;
+  bool _sending = false;
+  String? _choice;
   bool _shareDistrict = false;
   final _district = TextEditingController();
 
@@ -43,37 +45,38 @@ class _CommunityVoiceCardState extends State<CommunityVoiceCard> {
     super.dispose();
   }
 
-  Future<void> _answer(String barrier) async {
+  Future<void> _send() async {
     final app = context.read<AppState>();
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _sending = true);
     try {
       await app.communityVoice.submit(
-        barrier: barrier,
+        barrier: _choice!,
         situation: widget.situationId,
         district: _shareDistrict ? _district.text : null,
         language: app.language.code,
       );
       setState(() => _sent = true);
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(app.t('Could not send. Please try again.'))));
-      }
+      messenger.showSnackBar(SnackBar(content: Text(app.t('Could not send. Please try again.'))));
+    } finally {
+      if (mounted) setState(() => _sending = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_hidden) return const SizedBox.shrink();
-    return Card(
-      color: Colors.white,
+    final theme = Theme.of(context);
+    return Card.filled(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: _sent
             ? Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(context.tr('Thank you. Here is what people have told us so far:'),
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 12),
+                  Text(context.tr('Thank you. Here is what people have told us so far:'), style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 16),
                   const CommunityVoiceTotals(),
                 ],
               )
@@ -82,12 +85,9 @@ class _CommunityVoiceCardState extends State<CommunityVoiceCard> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.groups_outlined, color: Theme.of(context).colorScheme.primary),
+                      ExcludeSemantics(child: Icon(Icons.groups_outlined, color: theme.colorScheme.primary)),
                       const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(context.tr('Community Voice'),
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                      ),
+                      Expanded(child: Text(context.tr('Community Voice'), style: theme.textTheme.titleMedium)),
                       TextButton(
                         onPressed: () {
                           context.read<AppState>().communityVoice.skip();
@@ -97,40 +97,40 @@ class _CommunityVoiceCardState extends State<CommunityVoiceCard> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
                   Text(context.tr('What makes it hardest for people in your community to get help?'),
-                      style: const TextStyle(fontSize: 15)),
+                      style: theme.textTheme.bodyLarge),
                   const SizedBox(height: 4),
                   Text(context.tr('Anonymous. We only count answers; nobody sees yours.'),
-                      style: const TextStyle(fontSize: 14, color: Colors.black54)),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 12),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _shareDistrict,
+                    onChanged: (v) => setState(() => _shareDistrict = v ?? false),
+                    title: Text(context.tr('Also share my district')),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  if (_shareDistrict)
+                    TextField(controller: _district, decoration: InputDecoration(labelText: context.tr('District'))),
+                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
                       for (final (code, label) in barriers)
-                        ActionChip(
+                        ChoiceChip(
                           label: Text(context.tr(label)),
-                          onPressed: () => _answer(code),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                          selected: _choice == code,
+                          // One tap sends the answer (tick "share my district" first if wanted).
+                          onSelected: _sending
+                              ? null
+                              : (_) {
+                                  setState(() => _choice = code);
+                                  _send();
+                                },
                         ),
                     ],
                   ),
-                  CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _shareDistrict,
-                    onChanged: (v) => setState(() => _shareDistrict = v ?? false),
-                    title: Text(context.tr('Also share my district'), style: const TextStyle(fontSize: 14)),
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                  if (_shareDistrict)
-                    TextField(
-                      controller: _district,
-                      decoration: InputDecoration(
-                        labelText: context.tr('District'),
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
                 ],
               ),
       ),
@@ -157,13 +157,14 @@ class _CommunityVoiceTotalsState extends State<CommunityVoiceTotals> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return FutureBuilder<Map<String, int>>(
       future: _totals,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) return const LinearProgressIndicator();
         if (snap.hasError) {
-          return Text(context.tr('The totals are not available right now.'), style: const TextStyle(fontSize: 14));
+          return Text(context.tr('The totals are not available right now.'), style: theme.textTheme.bodyMedium);
         }
         final totals = snap.data!;
         final sum = totals.values.fold<int>(0, (a, b) => a + b);
@@ -172,31 +173,33 @@ class _CommunityVoiceTotalsState extends State<CommunityVoiceTotals> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (final (code, label) in barriers)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    SizedBox(width: 120, child: Text(context.tr(label), style: const TextStyle(fontSize: 14))),
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (context, c) => Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            height: 18,
-                            width: c.maxWidth * ((totals[code] ?? 0) / max),
-                            decoration: BoxDecoration(color: scheme.primary, borderRadius: BorderRadius.circular(4)),
-                          ),
-                        ),
+              Semantics(
+                label: '${context.tr(label)}: ${totals[code] ?? 0}',
+                excludeSemantics: true,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: Text(context.tr(label), style: theme.textTheme.bodyMedium)),
+                          Text('${totals[code] ?? 0}', style: theme.textTheme.labelLarge),
+                        ],
                       ),
-                    ),
-                    SizedBox(
-                      width: 40,
-                      child: Text('${totals[code] ?? 0}', textAlign: TextAlign.end, style: const TextStyle(fontSize: 14)),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      LinearProgressIndicator(
+                        value: (totals[code] ?? 0) / max,
+                        minHeight: 8,
+                        borderRadius: BorderRadius.circular(4),
+                        backgroundColor: scheme.surfaceContainerHighest,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            Text('${context.tr('Answers so far')}: $sum', style: const TextStyle(fontSize: 14, color: Colors.black54)),
+            Text('${context.tr('Answers so far')}: $sum',
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
           ],
         );
       },

@@ -9,12 +9,13 @@ import '../models/records.dart';
 import '../services/api_client.dart';
 import '../services/app_state.dart';
 import '../widgets/disclaimer_footer.dart';
+import '../widgets/layout.dart';
 import '../widgets/tr.dart';
 import 'referral_screen.dart';
 
 Future<void> _open(String url) => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
 
-/// Shown under every answer: a short way into Get help.
+/// On Home and under every answer: a short way into Get help.
 class GetHelpCard extends StatelessWidget {
   const GetHelpCard({super.key, this.situationId, this.summary});
 
@@ -23,9 +24,11 @@ class GetHelpCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Card(
-      color: scheme.primaryContainer,
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card.filled(
+      margin: EdgeInsets.zero,
+      color: scheme.secondaryContainer,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -33,18 +36,18 @@ class GetHelpCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.support_agent, color: scheme.onPrimaryContainer),
-                const SizedBox(width: 8),
+                ExcludeSemantics(child: Icon(Icons.support_agent, color: scheme.onSecondaryContainer)),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(context.tr('Need someone to help with your case?'),
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: scheme.onPrimaryContainer)),
+                      style: theme.textTheme.titleMedium?.copyWith(color: scheme.onSecondaryContainer)),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(context.tr('Find legal aid offices near you, or ask a verified organisation for help.'),
-                style: TextStyle(fontSize: 15, color: scheme.onPrimaryContainer)),
-            const SizedBox(height: 12),
+                style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSecondaryContainer)),
+            const SizedBox(height: kGap),
             FilledButton.icon(
               icon: const Icon(Icons.place_outlined),
               label: Text(context.tr('Find help near me')),
@@ -122,202 +125,237 @@ class _GetHelpScreenState extends State<GetHelpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final titleStyle = Theme.of(context).textTheme.titleMedium;
+    final showMap = mapsEnabled && _position != null && (_places?.isNotEmpty ?? false);
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('Get help'))),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(18),
-          children: [
-            Text(context.tr('Legal aid near you'), style: titleStyle),
-            const SizedBox(height: 4),
-            Text(
-              context.tr('Search results from Google Maps. These are not Eddembe partners; please check before you go.'),
-              style: const TextStyle(fontSize: 14, color: Colors.black54),
-            ),
-            const SizedBox(height: 12),
-            if (_places == null)
-              FilledButton.icon(
-                onPressed: _searching ? null : _findNearby,
-                icon: _searching
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.my_location),
-                label: Text(context.tr(_searching ? 'Searching near you...' : 'Find legal aid near me')),
-              ),
-            if (_placesError != null) ...[
-              const SizedBox(height: 8),
-              Text(context.tr(_placesError!), style: const TextStyle(fontSize: 14, color: Color(0xFFB3261E))),
-              TextButton.icon(
-                onPressed: () => _open(_searchInMaps),
-                icon: const Icon(Icons.map_outlined),
-                label: Text(context.tr('Search in Google Maps instead')),
-              ),
-            ],
-            if (_places != null) ..._results(context),
-            const SizedBox(height: 24),
-            Text(context.tr('Verified organisations'), style: titleStyle),
-            const SizedBox(height: 4),
-            Text(context.tr('Checked by the Eddembe team.'), style: const TextStyle(fontSize: 14, color: Colors.black54)),
-            const SizedBox(height: 12),
-            FutureBuilder<List<SupportOrganisation>>(
-              future: _verified,
-              builder: (context, snap) {
-                if (snap.connectionState != ConnectionState.done) return const LinearProgressIndicator();
-                final orgs = snap.data ?? const [];
-                if (orgs.isEmpty) {
-                  return Text(
-                    context.tr('Our team has not added verified organisations yet. Until then, please use the search results above.'),
-                    style: const TextStyle(fontSize: 15),
-                  );
-                }
-                return Column(children: [for (final o in orgs) _OrganisationCard(org: o, widget: widget)]);
-              },
-            ),
-            const SizedBox(height: 20),
-            const DisclaimerFooter(),
-          ],
-        ),
-      ),
+      body: showMap ? _mapLayout(context) : PageBody(maxWidth: 720, children: _content(context)),
     );
   }
 
-  List<Widget> _results(BuildContext context) {
+  /// A full-width map with the results in a sheet that can be dragged up.
+  Widget _mapLayout(BuildContext context) {
     final places = _places!;
-    if (places.isEmpty) {
-      return [
-        Text(context.tr('No legal aid offices were found near you.'), style: const TextStyle(fontSize: 15)),
-        TextButton.icon(
+    return Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition: CameraPosition(target: LatLng(_position!.latitude, _position!.longitude), zoom: 11),
+          myLocationEnabled: true,
+          markers: {
+            for (final p in places)
+              Marker(
+                markerId: MarkerId(p.id),
+                position: LatLng(p.lat, p.lng),
+                infoWindow: InfoWindow(title: p.name, snippet: p.address),
+              ),
+          },
+        ),
+        DraggableScrollableSheet(
+          initialChildSize: 0.4,
+          minChildSize: 0.15,
+          maxChildSize: 0.9,
+          builder: (context, controller) => Material(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            elevation: 1,
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+            child: ListView(
+              controller: controller,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              children: [
+                const Center(child: _DragHandle()),
+                ..._content(context),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _content(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return [
+      SectionTitle(context.tr('Legal aid near you')),
+      Text(context.tr('Search results from Google Maps. These are not Eddembe partners; please check before you go.'),
+          style: muted),
+      const SizedBox(height: kGap),
+      if (_places == null)
+        FilledButton.icon(
+          onPressed: _searching ? null : _findNearby,
+          icon: _searching
+              ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.my_location),
+          label: Text(context.tr(_searching ? 'Searching near you...' : 'Find legal aid near me')),
+        ),
+      if (_placesError != null) ...[
+        const SizedBox(height: 8),
+        Text(context.tr(_placesError!), style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () => _open(_searchInMaps),
+          icon: const Icon(Icons.map_outlined),
+          label: Text(context.tr('Search in Google Maps instead')),
+        ),
+      ],
+      if (_places != null && _places!.isEmpty) ...[
+        Text(context.tr('No legal aid offices were found near you.'), style: theme.textTheme.bodyLarge),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
           onPressed: () => _open(_searchInMaps),
           icon: const Icon(Icons.map_outlined),
           label: Text(context.tr('Search in Google Maps')),
         ),
-      ];
-    }
-    return [
-      if (mapsEnabled && _position != null)
-        Container(
-          height: 260,
-          margin: const EdgeInsets.only(bottom: 12),
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
-          child: GoogleMap(
-            initialCameraPosition: CameraPosition(target: LatLng(_position!.latitude, _position!.longitude), zoom: 11),
-            myLocationEnabled: true,
-            markers: {
-              for (final p in places)
-                Marker(
-                  markerId: MarkerId(p.id),
-                  position: LatLng(p.lat, p.lng),
-                  infoWindow: InfoWindow(title: p.name, snippet: p.address),
-                ),
-            },
-          ),
-        ),
-      for (final p in places)
-        Card(
-          color: Colors.white,
-          margin: const EdgeInsets.only(bottom: 8),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(p.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 2),
-                Text(p.address, style: const TextStyle(fontSize: 14, color: Colors.black54)),
-                Row(
-                  children: [
-                    if (p.phone != null)
-                      TextButton.icon(
-                        onPressed: () => _open('tel:${p.phone!.replaceAll(' ', '')}'),
-                        icon: const Icon(Icons.call),
-                        label: Text(p.phone!),
-                      ),
-                    if (p.mapsUrl != null)
-                      TextButton.icon(
-                        onPressed: () => _open(p.mapsUrl!),
-                        icon: const Icon(Icons.directions),
-                        label: Text(context.tr('Directions')),
-                      ),
-                  ],
-                ),
-              ],
+      ],
+      if (_places != null)
+        for (final p in _places!)
+          Card.outlined(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: const Icon(Icons.place_outlined),
+              title: Text(p.name),
+              subtitle: Text(p.address),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (p.phone != null)
+                    IconButton(
+                      icon: const Icon(Icons.call_outlined),
+                      tooltip: '${context.tr('Call')} ${p.phone}',
+                      onPressed: () => _open('tel:${p.phone!.replaceAll(' ', '')}'),
+                    ),
+                  if (p.mapsUrl != null)
+                    IconButton(
+                      icon: const Icon(Icons.directions_outlined),
+                      tooltip: context.tr('Directions'),
+                      onPressed: () => _open(p.mapsUrl!),
+                    ),
+                ],
+              ),
             ),
           ),
-        ),
+      SectionTitle(context.tr('Verified organisations')),
+      Text(context.tr('Checked by the Eddembe team.'), style: muted),
+      const SizedBox(height: 8),
+      FutureBuilder<List<SupportOrganisation>>(
+        future: _verified,
+        builder: (context, snap) {
+          if (snap.connectionState != ConnectionState.done) return const LinearProgressIndicator();
+          final orgs = snap.data ?? const [];
+          if (orgs.isEmpty) {
+            return EmptyState(
+              icon: Icons.verified_outlined,
+              message: context.tr(
+                  'Our team has not added verified organisations yet. Until then, please use the search results above.'),
+            );
+          }
+          return Column(children: [for (final o in orgs) _OrganisationTile(org: o, screen: widget)]);
+        },
+      ),
+      const DisclaimerFooter(),
     ];
   }
 }
 
-class _OrganisationCard extends StatelessWidget {
-  const _OrganisationCard({required this.org, required this.widget});
-
-  final SupportOrganisation org;
-  final GetHelpScreen widget;
+class _DragHandle extends StatelessWidget {
+  const _DragHandle();
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 10),
+    return Container(
+      width: 32,
+      height: 4,
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
+  }
+}
+
+class _OrganisationTile extends StatelessWidget {
+  const _OrganisationTile({required this.org, required this.screen});
+
+  final SupportOrganisation org;
+  final GetHelpScreen screen;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card.outlined(
+      margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.only(bottom: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Icon(Icons.verified, color: Color(0xFF1B5E20)),
-                const SizedBox(width: 8),
-                Expanded(child: Text(org.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text([context.tr(org.type), if (org.district != null) org.district!].join(' · '),
-                style: const TextStyle(fontSize: 14)),
-            if (org.address != null) Text(org.address!, style: const TextStyle(fontSize: 14, color: Colors.black54)),
-            if (org.languages.isNotEmpty)
-              Text('${context.tr('Languages')}: ${org.languages.join(', ')}', style: const TextStyle(fontSize: 14)),
-            const SizedBox(height: 4),
-            Text(
-              '${context.tr('Verified on')} ${org.verifiedOn} ${context.tr('by')} ${org.verifiedBy}',
-              style: const TextStyle(fontSize: 14, color: Colors.black54),
-            ),
-            Wrap(
-              spacing: 4,
-              children: [
-                if (org.phone != null)
-                  TextButton.icon(
-                    onPressed: () => _open('tel:${org.phone!.replaceAll(' ', '')}'),
-                    icon: const Icon(Icons.call),
-                    label: Text(org.phone!),
-                  ),
-                if (org.email != null)
-                  TextButton.icon(
-                    onPressed: () => _open('mailto:${org.email}'),
-                    icon: const Icon(Icons.email_outlined),
-                    label: Text(context.tr('Email')),
-                  ),
-                if (org.sourceUrl.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: () => _open(org.sourceUrl),
-                    icon: const Icon(Icons.link),
-                    label: Text(context.tr('Source')),
-                  ),
-              ],
-            ),
-            if (org.acceptsReferrals)
-              FilledButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        ReferralScreen(organisation: org, situationId: widget.situationId, summary: widget.summary),
-                  ),
-                ),
-                icon: const Icon(Icons.send),
-                label: Text(context.tr('Request help')),
+            ListTile(
+              title: Text(org.name),
+              subtitle: Text([
+                context.tr(org.type),
+                if (org.district != null) org.district!,
+                if (org.languages.isNotEmpty) org.languages.join(', '),
+              ].join(' · ')),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (org.phone != null)
+                    IconButton(
+                      icon: const Icon(Icons.call_outlined),
+                      tooltip: '${context.tr('Call')} ${org.phone}',
+                      onPressed: () => _open('tel:${org.phone!.replaceAll(' ', '')}'),
+                    ),
+                  // Demo organisations have example.org addresses that lead nowhere.
+                  if (org.email != null && !org.demo)
+                    IconButton(
+                      icon: const Icon(Icons.email_outlined),
+                      tooltip: context.tr('Email'),
+                      onPressed: () => _open('mailto:${org.email}'),
+                    ),
+                ],
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (org.demo)
+                    Chip(
+                      avatar: Icon(Icons.science_outlined, color: scheme.onSecondaryContainer),
+                      label: Text(context.tr('Demo · not a real organisation')),
+                      labelStyle: theme.textTheme.labelMedium?.copyWith(color: scheme.onSecondaryContainer),
+                      backgroundColor: scheme.secondaryContainer,
+                      side: BorderSide.none,
+                    )
+                  else
+                    Chip(
+                      avatar: Icon(Icons.verified, color: scheme.onTertiaryContainer),
+                      label: Text('${context.tr('Verified on')} ${org.verifiedOn}'),
+                      labelStyle: theme.textTheme.labelMedium?.copyWith(color: scheme.onTertiaryContainer),
+                      backgroundColor: scheme.tertiaryContainer,
+                      side: BorderSide.none,
+                    ),
+                  if (org.sourceUrl.isNotEmpty && !org.demo)
+                    TextButton(onPressed: () => _open(org.sourceUrl), child: Text(context.tr('Source'))),
+                  if (org.acceptsReferrals)
+                    FilledButton.tonalIcon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ReferralScreen(organisation: org, situationId: screen.situationId, summary: screen.summary),
+                        ),
+                      ),
+                      icon: const Icon(Icons.send),
+                      label: Text(context.tr('Request help')),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

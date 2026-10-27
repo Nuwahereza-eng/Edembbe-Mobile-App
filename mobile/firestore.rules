@@ -5,9 +5,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
 
-    // Each person's saved letters, private to their (anonymous) account.
-    match /users/{uid}/letters/{letterId} {
-      allow read, write: if signedIn() && request.auth.uid == uid;
+    // Each person's saved letters and past chats (questions, scans and answers), private to their
+    // (anonymous) account. Nobody else can read them.
+    match /users/{uid}/{collection}/{docId} {
+      allow read, write: if signedIn() && request.auth.uid == uid
+        && collection in ['letters', 'conversations'];
     }
 
     // Organisations the team has verified. Written only by server/scripts/import-orgs.ts (Admin SDK).

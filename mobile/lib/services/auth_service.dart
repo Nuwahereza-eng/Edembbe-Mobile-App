@@ -2,11 +2,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
+import '../firebase_options.dart';
+
 /// Firebase set-up and sign-in. The demo uses anonymous sign-in: no name, phone or email is asked for.
 ///
-/// Until `flutterfire configure` has been run for this app, Firebase cannot start. The app still works
-/// then: questions, scans and letters go to the API, letters are kept on the phone only, and the
-/// features that need Firestore (referrals, Community Voice, verified organisations) say so.
+/// The project settings are in firebase_options.dart (project eddembe-legal-ug). If Firebase cannot
+/// start (no network on first launch, or a platform without settings), the app still works:
+/// questions, scans and letters go to the API, letters are kept on the device only, and the features
+/// that need Firestore (referrals, Community Voice, verified organisations) say so.
 class AuthService {
   bool _available = false;
 
@@ -15,10 +18,10 @@ class AuthService {
 
   Future<void> init() async {
     try {
-      // With google-services.json in android/app (added by flutterfire configure), no options are needed.
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
       final auth = FirebaseAuth.instance;
-      if (auth.currentUser == null) await auth.signInAnonymously();
+      // The splash screen stays up until this finishes, so never wait long (no network on first launch).
+      if (auth.currentUser == null) await auth.signInAnonymously().timeout(const Duration(seconds: 10));
       _available = true;
     } catch (error) {
       debugPrint('Firebase is not available: $error');

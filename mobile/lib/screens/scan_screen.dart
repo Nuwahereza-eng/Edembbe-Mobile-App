@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../models/results.dart';
 import '../services/app_state.dart';
 import '../widgets/disclaimer_footer.dart';
+import '../widgets/layout.dart';
 import '../widgets/mic_button.dart';
 import '../widgets/settings_action.dart';
 import '../widgets/tr.dart';
@@ -21,6 +22,8 @@ class ScanScreen extends StatefulWidget {
   @override
   State<ScanScreen> createState() => _ScanScreenState();
 }
+
+enum _Source { camera, photos, files }
 
 class _ScanScreenState extends State<ScanScreen> {
   // The current host refuses uploads over about 4.5 MB.
@@ -37,7 +40,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
   final _picker = ImagePicker();
   final _question = TextEditingController();
-  String? _path;
+  Uint8List? _bytes;
   String? _mime;
   String? _name;
   String? _heard;
@@ -48,19 +51,63 @@ class _ScanScreenState extends State<ScanScreen> {
     super.dispose();
   }
 
+  Future<void> _choose() async {
+    final source = await showModalBottomSheet<_Source>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: Text(sheet.tr('Camera')),
+              subtitle: Text(sheet.tr('Take a photo of the page')),
+              onTap: () => Navigator.pop(sheet, _Source.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text(sheet.tr('Photos')),
+              subtitle: Text(sheet.tr('Choose a photo you already took')),
+              onTap: () => Navigator.pop(sheet, _Source.photos),
+            ),
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: Text(sheet.tr('Files')),
+              subtitle: Text(sheet.tr('A PDF or Word (.docx) file')),
+              onTap: () => Navigator.pop(sheet, _Source.files),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    switch (source) {
+      case _Source.camera:
+        await _pickPhoto(ImageSource.camera);
+      case _Source.photos:
+        await _pickPhoto(ImageSource.gallery);
+      case _Source.files:
+        await _pickFile();
+      case null:
+        break;
+    }
+  }
+
   Future<void> _pickPhoto(ImageSource source) async {
     // Shrunk on the phone to about 1600px on the long side, which Gemma reads well and uploads fast.
     final image = await _picker.pickImage(source: source, maxWidth: 1600, maxHeight: 1600, imageQuality: 82);
-    if (image != null) _setFile(image.path, image.name);
+    if (image != null) _setFile(await image.readAsBytes(), image.name);
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['pdf', 'docx']);
-    final path = result?.files.single.path;
-    if (path != null) _setFile(path, result!.files.single.name);
+    final result =
+        await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['pdf', 'docx'], withData: true);
+    final file = result?.files.single;
+    if (file?.bytes != null) _setFile(file!.bytes!, file.name);
   }
 
-  void _setFile(String path, String name) {
+  void _setFile(Uint8List bytes, String name) {
     final app = context.read<AppState>();
     final ext = name.split('.').last.toLowerCase();
     final mime = _mimeTypes[ext];
@@ -68,12 +115,12 @@ class _ScanScreenState extends State<ScanScreen> {
       _say(app.t('Please choose a photo, a PDF or a Word (.docx) file.'));
       return;
     }
-    if (File(path).lengthSync() > _maxBytes) {
+    if (bytes.length > _maxBytes) {
       _say(app.t('This file is too large. Please take a photo of the page instead.'));
       return;
     }
     setState(() {
-      _path = path;
+      _bytes = bytes;
       _mime = mime;
       _name = name;
     });
@@ -83,7 +130,8 @@ class _ScanScreenState extends State<ScanScreen> {
 
   void _analyze() {
     final app = context.read<AppState>();
-    final path = _path!;
+    final bytes = _bytes!;
+    final name = _name!;
     final mime = _mime!;
     final question = _question.text.trim();
     final heard = _heard != null && _heard == question ? _heard : null;
@@ -94,7 +142,8 @@ class _ScanScreenState extends State<ScanScreen> {
           isScan: true,
           firstRequest: () async {
             final result = await app.api.analyze(
-              filePath: path,
+              bytes: bytes,
+              fileName: name,
               mimeType: mime,
               language: app.language.code,
               question: question.isEmpty ? null : question,
@@ -108,106 +157,99 @@ class _ScanScreenState extends State<ScanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final isImage = _mime?.startsWith('image/') ?? false;
     return Scaffold(
-      appBar: AppBar(title: Text(context.tr('Scan')), actions: const [SettingsAction()]),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(18),
-          children: [
-            Text(context.tr('Check a document'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text(
-              context.tr('A notice to leave, a contract, a dismissal letter, a land agreement...'),
-              style: const TextStyle(fontSize: 15, color: Colors.black54),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => _pickPhoto(ImageSource.camera),
-                    icon: const Icon(Icons.photo_camera),
-                    label: Text(context.tr('Take photo')),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _pickPhoto(ImageSource.gallery),
-                    icon: const Icon(Icons.photo_library_outlined),
-                    label: Text(context.tr('Gallery')),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _pickFile,
-              icon: const Icon(Icons.upload_file),
-              label: Text(context.tr('PDF or Word file')),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              height: 240,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.black12),
-              ),
+      appBar: AppBar(title: Text(context.tr('Scan')), actions: const [AppBarActions()]),
+      body: PageBody(
+        maxWidth: 720,
+        children: [
+          Text(context.tr('Check a document'), style: theme.textTheme.headlineMedium),
+          const SizedBox(height: 8),
+          Text(
+            context.tr('A notice to leave, a contract, a dismissal letter, a land agreement...'),
+            style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 24),
+          if (_bytes == null)
+            Card.outlined(
+              margin: EdgeInsets.zero,
               clipBehavior: Clip.antiAlias,
-              child: _path == null
-                  ? Center(
-                      child: Text(context.tr('No document chosen yet'), style: const TextStyle(color: Colors.black54)),
-                    )
-                  : isImage
-                      ? Image.file(File(_path!), fit: BoxFit.contain, width: double.infinity)
-                      : Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.description, size: 56),
-                              const SizedBox(height: 8),
-                              Text(_name ?? '', textAlign: TextAlign.center),
-                            ],
-                          ),
-                        ),
-            ),
-            const SizedBox(height: 20),
-            Text(context.tr('Your question (optional)'), style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _question,
-              minLines: 2,
-              maxLines: 4,
-              maxLength: 1000,
-              decoration: InputDecoration(
-                hintText: context.tr('For example: Is this allowed?'),
-                border: const OutlineInputBorder(),
+              child: InkWell(
+                onTap: _choose,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 16),
+                  child: Column(
+                    children: [
+                      ExcludeSemantics(child: Icon(Icons.document_scanner_outlined, size: 56, color: scheme.primary)),
+                      const SizedBox(height: kGap),
+                      Text(context.tr('No document chosen yet'), style: theme.textTheme.bodyLarge),
+                      const SizedBox(height: kGap),
+                      FilledButton.icon(
+                        onPressed: _choose,
+                        icon: const Icon(Icons.add_a_photo_outlined),
+                        label: Text(context.tr('Choose document')),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            Card.outlined(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (isImage)
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 320),
+                      child: ColoredBox(
+                        color: scheme.surfaceContainerHighest,
+                        child: Image.memory(_bytes!, fit: BoxFit.contain, semanticLabel: context.tr('Your document')),
+                      ),
+                    ),
+                  ListTile(
+                    leading: Icon(isImage ? Icons.image_outlined : Icons.description_outlined),
+                    title: Text(_name ?? '', maxLines: 1, overflow: TextOverflow.ellipsis),
+                    trailing: OutlinedButton(onPressed: _choose, child: Text(context.tr('Change'))),
+                  ),
+                ],
               ),
             ),
-            if (_heard != null && _heard == _question.text)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(context.tr('We heard this. You can correct it before you continue.'),
-                    style: const TextStyle(fontSize: 14, color: Colors.black54)),
-              ),
-            MicButton(
-              onText: (text) => setState(() {
-                _heard = text;
-                _question.text = text;
-              }),
+          SectionTitle(context.tr('Your question (optional)')),
+          TextField(
+            controller: _question,
+            minLines: 2,
+            maxLines: 4,
+            maxLength: 1000,
+            decoration: InputDecoration(hintText: context.tr('For example: Is this allowed?')),
+          ),
+          if (_heard != null && _heard == _question.text)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(context.tr('We heard this. You can correct it before you continue.'),
+                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
             ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: _path == null ? null : _analyze,
+          MicButton(
+            onText: (text) => setState(() {
+              _heard = text;
+              _question.text = text;
+            }),
+          ),
+          const SizedBox(height: 24),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: _bytes == null ? null : _analyze,
               icon: const Icon(Icons.gavel),
-              label: Text(context.tr('Check against the law')),
+              label: Text(context.tr('Explain this document')),
             ),
-            const SizedBox(height: 20),
-            const DisclaimerFooter(),
-          ],
-        ),
+          ),
+          const DisclaimerFooter(),
+        ],
       ),
     );
   }

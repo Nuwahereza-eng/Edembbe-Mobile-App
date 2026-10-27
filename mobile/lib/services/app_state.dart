@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/material.dart' show ThemeMode;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,31 +12,36 @@ import 'api_client.dart';
 import 'audio_service.dart';
 import 'auth_service.dart';
 import 'community_voice_service.dart';
+import 'conversations_repository.dart';
 import 'letters_repository.dart';
 import 'referrals_repository.dart';
 import 'support_repository.dart';
 
 /// The chosen language and the services every screen uses.
 ///
-/// It also translates the app's own words (button labels, guided questions) into the chosen language
-/// through the server's translate endpoint, caching them on the phone. Until a translation arrives the
-/// English text shows. Law names and section numbers are never passed through here.
+/// It also shows the app's own words (button labels, guided questions) in the chosen language. Most come
+/// translated with the app (assets/i18n, made by tool/translate_ui.dart); anything missing is fetched
+/// slowly through the server so the app never uses up Sunbird's rate limit, which answers need.
+/// Until a translation arrives the English text shows. Law names and section numbers never go through here.
 class AppState extends ChangeNotifier {
   AppState._(this.auth)
       : api = ApiClient(baseUrl: apiBaseUrl, auth: auth),
         audio = AudioService() {
     letters = LettersRepository(auth);
+    conversations = ConversationsRepository(auth);
     referrals = ReferralsRepository(auth);
     support = SupportRepository(auth);
     communityVoice = CommunityVoiceService(auth, api);
   }
 
   static const _languageKey = 'selected_language_code';
+  static const _themeKey = 'theme_mode';
 
   final AuthService auth;
   final ApiClient api;
   final AudioService audio;
   late final LettersRepository letters;
+  late final ConversationsRepository conversations;
   late final ReferralsRepository referrals;
   late final SupportRepository support;
   late final CommunityVoiceService communityVoice;
@@ -49,6 +56,7 @@ class AppState extends ChangeNotifier {
     final state = AppState._(auth);
     final prefs = await SharedPreferences.getInstance();
     state._language = findLanguage(prefs.getString(_languageKey));
+    state._themeMode = ThemeMode.values.asNameMap()[prefs.getString(_themeKey)] ?? ThemeMode.system;
     await state._loadCache();
     return state;
   }
@@ -62,7 +70,18 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Bumped when letters or referrals change, so My cases reloads.
+  /// Light, dark, or follow the phone's setting (the default). Chosen in Settings.
+  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode get themeMode => _themeMode;
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeKey, mode.name);
+  }
+
+  /// Bumped when chats, letters or referrals change, so My cases reloads.
   int casesVersion = 0;
 
   void casesChanged() {
@@ -82,10 +101,25 @@ class AppState extends ChangeNotifier {
   Future<void> _loadCache() async {
     _cache = {};
     if (language.isEnglish) return;
+    try {
+      final shipped = await rootBundle.loadString('assets/i18n/${language.code}.json');
+      _cache = Map<String, String>.from(jsonDecode(shipped) as Map);
+    } catch (_) {
+      // Not every language ships with translations; the rest are fetched as needed.
+    }
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_cacheKey);
-    if (raw != null) _cache = Map<String, String>.from(jsonDecode(raw) as Map);
+    if (raw != null) {
+      for (final e in Map<String, String>.from(jsonDecode(raw) as Map).entries) {
+        _cache.putIfAbsent(e.key, () => e.value);
+      }
+    }
   }
+
+  // Missing words are fetched 10 at a time, at most every 20 seconds (Sunbird allows 50 a minute
+  // for everyone, and answers need that more).
+  static const _batchSize = 10;
+  static const _batchGap = Duration(seconds: 20);
 
   /// [english] in the chosen language, or [english] itself while the translation loads.
   String t(String english) {
@@ -101,7 +135,7 @@ class AppState extends ChangeNotifier {
   Future<void> _fetchPending() async {
     _batchTimer = null;
     final code = language.code;
-    final batch = _pending.take(50).toList();
+    final batch = _pending.take(_batchSize).toList();
     if (batch.isEmpty) return;
     try {
       final out = await api.translate(batch, target: code);
@@ -119,7 +153,7 @@ class AppState extends ChangeNotifier {
       _pending.removeAll(batch);
     }
     notifyListeners();
-    if (_pending.isNotEmpty) _batchTimer ??= Timer(const Duration(milliseconds: 80), _fetchPending);
+    if (_pending.isNotEmpty) _batchTimer ??= Timer(_batchGap, _fetchPending);
   }
 
   @override

@@ -6,8 +6,9 @@ import '../config/languages.dart';
 import '../services/app_state.dart';
 import '../widgets/community_voice_card.dart';
 import '../widgets/disclaimer_footer.dart';
+import '../widgets/language_list.dart';
+import '../widgets/layout.dart';
 import '../widgets/tr.dart';
-import 'language_picker_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -16,71 +17,69 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final language = app.language;
-    const heading = TextStyle(fontSize: 18, fontWeight: FontWeight.w700);
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('Settings'))),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(18),
-          children: [
-            Text(context.tr('Language'), style: heading),
-            const SizedBox(height: 8),
-            Card(
-              color: Colors.white,
-              child: ListTile(
-                minTileHeight: 56,
-                leading: const Icon(Icons.translate),
-                title: Text(language.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text([
-                  language.canSpeak ? context.tr('You can ask by voice.') : context.tr(voiceInputUnavailable),
-                  if (language.canListen) context.tr('Answers can be read aloud.'),
-                ].join(' ')),
-                trailing: Text(context.tr('Change')),
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LanguagePickerScreen())),
-              ),
+      body: PageBody(
+        maxWidth: 720,
+        children: [
+          SectionTitle(context.tr('Language')),
+          Card.outlined(
+            child: ListTile(
+              leading: const Icon(Icons.translate),
+              title: Text(language.name),
+              subtitle: Text([
+                language.canSpeak ? context.tr('You can ask by voice.') : context.tr(voiceInputUnavailable),
+                if (language.canListen) context.tr('Answers can be played aloud.'),
+              ].join(' ')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => showLanguageSheet(context),
             ),
-            const SizedBox(height: 20),
-            const DisclaimerFooter(),
-            const SizedBox(height: 20),
-            Text(context.tr('Your account'), style: heading),
-            const SizedBox(height: 8),
-            Card(
-              color: Colors.white,
-              child: ListTile(
-                leading: Icon(app.auth.available ? Icons.cloud_done_outlined : Icons.phone_android),
-                title: Text(context.tr(app.auth.available ? 'Signed in without a name' : 'Not signed in')),
-                subtitle: Text(context.tr(app.auth.available
-                    ? 'Your letters and help requests are saved to your private Eddembe account.'
-                    : 'Letters are saved on this phone only. Help requests and Community Voice need sign-in.')),
-              ),
-            ),
-            if (app.auth.available) ...[
-              const SizedBox(height: 20),
-              Text(context.tr('Community Voice'), style: heading),
-              const SizedBox(height: 4),
-              Text(context.tr('What makes it hardest for people in your community to get help?'),
-                  style: const TextStyle(fontSize: 14, color: Colors.black54)),
-              const SizedBox(height: 12),
-              const Card(color: Colors.white, child: Padding(padding: EdgeInsets.all(16), child: CommunityVoiceTotals())),
+          ),
+          SectionTitle(context.tr('Appearance')),
+          SegmentedButton<ThemeMode>(
+            segments: [
+              ButtonSegment(value: ThemeMode.light, icon: const Icon(Icons.light_mode_outlined), label: Text(context.tr('Light'))),
+              ButtonSegment(value: ThemeMode.dark, icon: const Icon(Icons.dark_mode_outlined), label: Text(context.tr('Dark'))),
+              ButtonSegment(
+                  value: ThemeMode.system, icon: const Icon(Icons.brightness_auto_outlined), label: Text(context.tr('System'))),
             ],
-            const SizedBox(height: 20),
-            Text(context.tr('About'), style: heading),
-            const SizedBox(height: 8),
-            Text(
-              context.tr('Eddembe explains Ugandan law in simple words. Answers come only from the laws in our '
-                  'library and always show the law and section they rely on. Built by Team TechGenz.'),
-              style: const TextStyle(fontSize: 14),
+            selected: {app.themeMode},
+            onSelectionChanged: (s) => context.read<AppState>().setThemeMode(s.first),
+          ),
+          SectionTitle(context.tr('Your account')),
+          Card.outlined(
+            child: ListTile(
+              leading: Icon(app.auth.available ? Icons.cloud_done_outlined : Icons.phone_android),
+              title: Text(context.tr(app.auth.available ? 'Signed in without a name' : 'Not signed in')),
+              subtitle: Text(context.tr(app.auth.available
+                  ? 'Your letters and help requests are saved to your private Eddembe account.'
+                  : 'Letters are saved on this device only. Help requests and Community Voice need sign-in.')),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Gemma 4 via the Gemini API, Sunbird AI for Ugandan languages, Firebase and Flutter. '
-              'Some ideas were inspired by the Sauti-Yo project.',
-              style: TextStyle(fontSize: 14, color: Colors.black54),
-            ),
-            const SizedBox(height: 8),
-            Text('API: $apiBaseUrl', style: const TextStyle(fontSize: 14, color: Colors.black45)),
+          ),
+          if (app.auth.available) ...[
+            SectionTitle(context.tr('Community Voice')),
+            Text(context.tr('What makes it hardest for people in your community to get help?'), style: muted),
+            const SizedBox(height: 12),
+            const Card.outlined(child: Padding(padding: EdgeInsets.all(16), child: CommunityVoiceTotals())),
           ],
-        ),
+          SectionTitle(context.tr('About')),
+          Text(
+            context.tr('Eddembe explains Ugandan law in simple words. Answers come only from the laws in our '
+                'library and always show the law and section they rely on. Built by Team TechGenz.'),
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Gemma 4 via the Gemini API, Sunbird AI for Ugandan languages, Firebase and Flutter. '
+            'Some ideas were inspired by the Sauti-Yo project.',
+            style: muted,
+          ),
+          const SizedBox(height: 8),
+          Text('API: $apiBaseUrl', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
+          const DisclaimerFooter(),
+        ],
       ),
     );
   }

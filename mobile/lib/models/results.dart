@@ -31,9 +31,12 @@ class AskResult {
     required this.citations,
     required this.confidence,
     this.questionEn,
+    this.translationFailed = false,
+    this.json = const {},
   });
 
   factory AskResult.fromJson(Map<String, dynamic> j) => AskResult(
+        json: j,
         answer: j['answer']?.toString() ?? '',
         answerEn: j['answer_en']?.toString() ?? j['answer']?.toString() ?? '',
         nextSteps: _strings(j['next_steps']),
@@ -43,6 +46,7 @@ class AskResult {
             .toList(),
         confidence: j['confidence']?.toString() ?? 'low',
         questionEn: _string(j['question_en']),
+        translationFailed: j['translation_failed'] == true,
       );
 
   final String answer;
@@ -52,6 +56,12 @@ class AskResult {
   final List<Citation> citations;
   final String confidence;
   final String? questionEn;
+
+  /// The server could not translate the answer in time, so it is in English.
+  final bool translationFailed;
+
+  /// The server's reply as received, kept so a saved conversation can be shown again exactly.
+  final Map<String, dynamic> json;
 }
 
 class RelatedSection extends Citation {
@@ -91,9 +101,12 @@ class AnalyzeResult {
     this.questionEn,
     this.questionAnswer,
     this.questionAnswerEn,
+    this.translationFailed = false,
+    this.json = const {},
   });
 
   factory AnalyzeResult.fromJson(Map<String, dynamic> j) => AnalyzeResult(
+        json: j,
         documentType: j['document_type']?.toString() ?? 'Document',
         transcription: j['transcription']?.toString() ?? '',
         summary: j['summary']?.toString() ?? '',
@@ -109,6 +122,7 @@ class AnalyzeResult {
         questionEn: _string(j['question_en']),
         questionAnswer: _string(j['question_answer']),
         questionAnswerEn: _string(j['question_answer_en']),
+        translationFailed: j['translation_failed'] == true,
       );
 
   final String documentType;
@@ -124,6 +138,12 @@ class AnalyzeResult {
   final String? questionEn;
   final String? questionAnswer;
   final String? questionAnswerEn;
+
+  /// The server could not translate the result in time, so it is in English.
+  final bool translationFailed;
+
+  /// The server's reply as received, kept so a saved conversation can be shown again exactly.
+  final Map<String, dynamic> json;
 
   /// Sections linked to the red flag at [index] (red flags come back in the same order in both languages).
   List<RelatedSection> sectionsForFlag(int index) {
@@ -168,6 +188,31 @@ class Turn {
   }
 
   List<Citation> get citations => ask?.citations ?? scan!.relatedSections;
+
+  bool get translationFailed => ask?.translationFailed ?? scan!.translationFailed;
+
+  /// For saving in a conversation: what was asked and the server's reply, as plain data.
+  Map<String, dynamic> toJson() => {
+        'kind': ask != null ? 'ask' : 'scan',
+        'question': question,
+        if (heard != null) 'heard': heard,
+        if (questionEn != null) 'question_en': questionEn,
+        'result': ask?.json ?? scan!.json,
+      };
+
+  static Turn fromJson(Map<String, dynamic> j) {
+    final result = Map<String, dynamic>.from(j['result'] as Map? ?? const {});
+    final question = j['question']?.toString() ?? '';
+    final heard = j['heard']?.toString();
+    return j['kind'] == 'scan'
+        ? Turn.scan(question: question, scan: AnalyzeResult.fromJson(result), heard: heard)
+        : Turn.ask(
+            question: question,
+            ask: AskResult.fromJson(result),
+            heard: heard,
+            questionEn: j['question_en']?.toString(),
+          );
+  }
 
   /// The question in English, for prefilling a letter.
   String get englishQuestion => questionEn ?? ask?.questionEn ?? scan?.questionEn ?? question;
