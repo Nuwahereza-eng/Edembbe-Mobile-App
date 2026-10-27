@@ -1,4 +1,5 @@
 eddembe-mobile-agent-prompt.md
+eddembe-mobile-ui-prompt.md
 
 # Secrets: Firebase admin keys and env files must never be committed.
 *firebase-adminsdk*.json
