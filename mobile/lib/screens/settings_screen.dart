@@ -77,6 +77,11 @@ class SettingsScreen extends StatelessWidget {
             style: muted,
           ),
           const SizedBox(height: 8),
+          Text(
+            '${context.tr('On a phone without the app, dial')} $ussdCode. ${context.tr('The answer comes by SMS.')}',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
           Text('API: $apiBaseUrl', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
           const DisclaimerFooter(),
         ],

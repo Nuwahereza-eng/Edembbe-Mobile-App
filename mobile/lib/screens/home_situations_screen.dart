@@ -4,6 +4,7 @@ import '../config/situations.dart';
 import '../widgets/layout.dart';
 import '../widgets/settings_action.dart';
 import '../widgets/tr.dart';
+import '../widgets/ussd_card.dart';
 import 'get_help_screen.dart';
 import 'guided_flow_screen.dart';
 
@@ -44,6 +45,8 @@ class HomeSituationsScreen extends StatelessWidget {
           }),
           const SizedBox(height: 24),
           const GetHelpCard(),
+          const SizedBox(height: 12),
+          const UssdCard(),
         ],
       ),
     );
