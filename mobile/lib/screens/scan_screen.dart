@@ -165,24 +165,20 @@ class _ScanScreenState extends State<ScanScreen> {
       body: PageBody(
         maxWidth: 720,
         children: [
-          Text(context.tr('Check a document'), style: theme.textTheme.headlineMedium),
-          const SizedBox(height: 8),
-          Text(
-            context.tr('A notice to leave, a contract, a dismissal letter, a land agreement...'),
-            style: theme.textTheme.bodyLarge?.copyWith(color: scheme.onSurfaceVariant),
+          PageIntro(
+            title: context.tr('Check a document'),
+            subtitle: context.tr('A notice to leave, a contract, a dismissal letter, a land agreement...'),
           ),
           const SizedBox(height: 24),
           if (_bytes == null)
             Card.outlined(
-              margin: EdgeInsets.zero,
-              clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: _choose,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
                   child: Column(
                     children: [
-                      ExcludeSemantics(child: Icon(Icons.document_scanner_outlined, size: 56, color: scheme.primary)),
+                      const LeadingTile(size: 64, child: Icon(Icons.document_scanner_outlined, size: 32)),
                       const SizedBox(height: kGap),
                       Text(context.tr('No document chosen yet'), style: theme.textTheme.bodyLarge),
                       const SizedBox(height: kGap),
@@ -198,8 +194,6 @@ class _ScanScreenState extends State<ScanScreen> {
             )
           else
             Card.outlined(
-              margin: EdgeInsets.zero,
-              clipBehavior: Clip.antiAlias,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [

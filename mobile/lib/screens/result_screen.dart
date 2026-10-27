@@ -307,8 +307,7 @@ class _TurnView extends StatelessWidget {
     final ask = turn.ask;
     final scan = turn.scan;
     return [
-      Card.filled(
-        margin: EdgeInsets.zero,
+      Card.outlined(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -372,7 +371,6 @@ class _TurnView extends StatelessWidget {
       if (scan != null && scan.missingItems.isNotEmpty) ...[
         SectionTitle(context.tr('What is missing')),
         Card.outlined(
-          margin: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(children: [for (final item in scan.missingItems) MissingItemTile(text: item)]),
@@ -382,17 +380,11 @@ class _TurnView extends StatelessWidget {
       if (ask != null && ask.nextSteps.isNotEmpty) ...[
         SectionTitle(context.tr('What you can do next')),
         Card.outlined(
-          margin: EdgeInsets.zero,
           child: Column(
             children: [
               for (final (i, step) in ask.nextSteps.indexed)
                 ListTile(
-                  leading: CircleAvatar(
-                    radius: 14,
-                    backgroundColor: scheme.primaryContainer,
-                    foregroundColor: scheme.onPrimaryContainer,
-                    child: Text('${i + 1}', style: theme.textTheme.labelLarge),
-                  ),
+                  leading: LeadingTile(size: 32, child: Text('${i + 1}')),
                   title: Text(step),
                 ),
             ],

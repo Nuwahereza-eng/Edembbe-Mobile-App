@@ -27,7 +27,7 @@ class SettingsScreen extends StatelessWidget {
           SectionTitle(context.tr('Language')),
           Card.outlined(
             child: ListTile(
-              leading: const Icon(Icons.translate),
+              leading: const LeadingTile(child: Icon(Icons.translate)),
               title: Text(language.name),
               subtitle: Text([
                 language.canSpeak ? context.tr('You can ask by voice.') : context.tr(voiceInputUnavailable),
@@ -51,7 +51,7 @@ class SettingsScreen extends StatelessWidget {
           SectionTitle(context.tr('Your account')),
           Card.outlined(
             child: ListTile(
-              leading: Icon(app.auth.available ? Icons.cloud_done_outlined : Icons.phone_android),
+              leading: LeadingTile(child: Icon(app.auth.available ? Icons.cloud_done_outlined : Icons.phone_android)),
               title: Text(context.tr(app.auth.available ? 'Signed in without a name' : 'Not signed in')),
               subtitle: Text(context.tr(app.auth.available
                   ? 'Your letters and help requests are saved to your private Eddembe account.'

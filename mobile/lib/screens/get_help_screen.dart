@@ -8,6 +8,7 @@ import '../config/env.dart';
 import '../models/records.dart';
 import '../services/api_client.dart';
 import '../services/app_state.dart';
+import '../theme.dart';
 import '../widgets/disclaimer_footer.dart';
 import '../widgets/layout.dart';
 import '../widgets/tr.dart';
@@ -27,8 +28,8 @@ class GetHelpCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Card.filled(
-      margin: EdgeInsets.zero,
       color: scheme.secondaryContainer,
+      shape: kTintedCardShape,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -211,7 +212,7 @@ class _GetHelpScreenState extends State<GetHelpScreen> {
           Card.outlined(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
-              leading: const Icon(Icons.place_outlined),
+              leading: const LeadingTile(child: Icon(Icons.place_outlined)),
               title: Text(p.name),
               subtitle: Text(p.address),
               trailing: Row(

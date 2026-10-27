@@ -4,7 +4,7 @@ import 'package:eddembe_mobile/models/results.dart';
 import 'package:eddembe_mobile/screens/guided_flow_screen.dart';
 import 'package:eddembe_mobile/screens/home_situations_screen.dart';
 import 'package:eddembe_mobile/services/app_state.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -41,6 +41,71 @@ void main() {
     expect(find.text('My landlord wants me out'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Something else'), 200);
     expect(find.text('Something else'), findsOneWidget);
+  });
+
+  testWidgets('the whole situation card opens its questions', (tester) async {
+    SharedPreferences.setMockInitialValues({'selected_language_code': 'eng'});
+    await tester.runAsync(() => pumpApp(tester));
+    expect(find.text('Housing'), findsOneWidget);
+    // Tapping the description, not the title or arrow, still opens the guided flow.
+    await tester.tap(find.text('Eviction notices, rent, deposits or locked doors.'));
+    await settle(tester);
+    expect(find.byType(GuidedFlowScreen), findsOneWidget);
+  });
+
+  testWidgets('each situation card is one button for screen readers', (tester) async {
+    SharedPreferences.setMockInitialValues({'selected_language_code': 'eng'});
+    final semantics = tester.ensureSemantics();
+    await tester.runAsync(() => pumpApp(tester));
+    expect(
+      tester.getSemantics(find.text('Problem at work')),
+      matchesSemantics(
+        label: 'Work\nProblem at work\nUnpaid wages, dismissal, contracts or unfair treatment.',
+        isButton: true,
+        hasTapAction: true,
+        hasFocusAction: true,
+        isFocusable: true,
+      ),
+    );
+    semantics.dispose();
+  });
+
+  testWidgets('a guided answer is one selectable row', (tester) async {
+    SharedPreferences.setMockInitialValues({'selected_language_code': 'eng'});
+    final semantics = tester.ensureSemantics();
+    await tester.runAsync(() => pumpApp(tester));
+    await tester.tap(find.text('My landlord wants me out'));
+    await settle(tester);
+    expect(tester.getSemantics(find.text('The rent was raised')), matchesSemantics(
+      label: 'The rent was raised',
+      isButton: true,
+      hasSelectedState: true,
+      isSelected: false,
+      hasTapAction: true,
+      hasFocusAction: true,
+      isFocusable: true,
+    ));
+    await tester.tap(find.text('The rent was raised'));
+    await settle(tester);
+    expect(tester.getSemantics(find.text('The rent was raised')).flagsCollection.isSelected, isTrue);
+    expect(find.byIcon(Icons.radio_button_checked), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('the bottom navigation switches tabs and marks the selected one', (tester) async {
+    SharedPreferences.setMockInitialValues({'selected_language_code': 'eng'});
+    await tester.runAsync(() => pumpApp(tester));
+    int selected() => tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
+    expect(selected(), 0);
+    await tester.tap(find.text('Scan').last);
+    await settle(tester);
+    expect(selected(), 2);
+    await tester.tap(find.text('My cases').last);
+    await settle(tester);
+    expect(selected(), 3);
+    await tester.tap(find.text('Home').last);
+    await settle(tester);
+    expect(selected(), 0);
   });
 
   test('guided answers become one plain question', () {

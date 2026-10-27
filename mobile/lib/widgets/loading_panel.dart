@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../theme.dart';
 import 'layout.dart';
 import 'tr.dart';
 
@@ -77,6 +78,7 @@ class ErrorPanel extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Card.filled(
       color: scheme.errorContainer,
+      shape: kTintedCardShape,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/results.dart';
+import '../theme.dart';
 
 /// A red flag found in a document, on the error container, with the law sections it is linked to.
 class RedFlagTile extends StatelessWidget {
@@ -18,7 +19,7 @@ class RedFlagTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: scheme.errorContainer,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: const RoundedRectangleBorder(borderRadius: kCardRadius),
         child: ListTile(
           leading: Icon(Icons.warning_amber_rounded, color: on, semanticLabel: 'Red flag'),
           textColor: on,

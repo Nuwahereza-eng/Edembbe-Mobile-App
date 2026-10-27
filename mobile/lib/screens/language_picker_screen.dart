@@ -23,9 +23,11 @@ class LanguagePickerScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.balance, size: 48, color: theme.colorScheme.primary, semanticLabel: 'Eddembe'),
+                    const LeadingTile(size: 64, child: Icon(Icons.balance, size: 36, semanticLabel: 'Eddembe')),
                     const SizedBox(height: kGap),
-                    Text('Eddembe', style: theme.textTheme.displaySmall),
+                    Text('Eddembe',
+                        style: theme.textTheme.displaySmall
+                            ?.copyWith(fontWeight: FontWeight.w700, color: theme.colorScheme.primary)),
                     const SizedBox(height: 4),
                     Text('Know your rights under Ugandan law.',
                         style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant)),

@@ -138,18 +138,15 @@ class _GuidedFlowScreenState extends State<GuidedFlowScreen> {
         child: Text(context.tr(step.prompt), style: Theme.of(context).textTheme.headlineSmall),
       ),
       const SizedBox(height: 24),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final choice in step.choices)
-            ChoiceChip(
-              label: Text(context.tr(choice.label)),
-              selected: _answers[index] == choice,
-              onSelected: (_) => setState(() => _answers[index] = choice),
-            ),
-        ],
-      ),
+      for (final choice in step.choices)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _ChoiceRow(
+            label: context.tr(choice.label),
+            selected: _answers[index] == choice,
+            onTap: () => setState(() => _answers[index] = choice),
+          ),
+        ),
     ];
   }
 
@@ -184,5 +181,49 @@ class _GuidedFlowScreenState extends State<GuidedFlowScreen> {
         }),
       ),
     ];
+  }
+}
+
+/// One answer: a full-width row that is easy to tap. The selected one shows a filled radio mark,
+/// a bolder label, a green border and fill, so it never relies on colour alone.
+class _ChoiceRow extends StatelessWidget {
+  const _ChoiceRow({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return TappableCard(
+      selected: selected,
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                color: selected ? scheme.primary : scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: selected ? scheme.onSecondaryContainer : scheme.onSurface,
+                    fontWeight: selected ? FontWeight.w600 : null,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

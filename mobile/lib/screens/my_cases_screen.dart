@@ -112,7 +112,7 @@ class _MyCasesScreenState extends State<MyCasesScreen> {
                   Card.outlined(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
-                      leading: Icon(chat.isScan ? Icons.document_scanner_outlined : Icons.chat_outlined),
+                      leading: LeadingTile(child: Icon(chat.isScan ? Icons.document_scanner_outlined : Icons.chat_outlined)),
                       title: Text(chat.title, maxLines: 2, overflow: TextOverflow.ellipsis),
                       subtitle: Text(
                         [
@@ -180,7 +180,7 @@ class _MyCasesScreenState extends State<MyCasesScreen> {
                   Card.outlined(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
-                      leading: const Icon(Icons.description_outlined),
+                      leading: const LeadingTile(child: Icon(Icons.description_outlined)),
                       title: Text(letter.title),
                       subtitle: Text(_day(letter.updatedAt), style: theme.textTheme.bodySmall),
                       trailing: IconButton(
@@ -247,7 +247,7 @@ class _MyCasesScreenState extends State<MyCasesScreen> {
                   Card.outlined(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
-                      leading: const Icon(Icons.support_agent_outlined),
+                      leading: const LeadingTile(child: Icon(Icons.support_agent_outlined)),
                       title: Text(r.organisationName),
                       subtitle: Text(
                         [

@@ -61,7 +61,6 @@ class _AskScreenState extends State<AskScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final language = context.watch<AppState>().language;
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('Ask')), actions: const [AppBarActions()]),
@@ -72,11 +71,9 @@ class _AskScreenState extends State<AskScreen> {
           Expanded(
             child: PageBody(
               children: [
-                Text(context.tr('Ask about your rights'), style: theme.textTheme.headlineMedium),
-                const SizedBox(height: 8),
-                Text(
-                  '${context.tr('Housing, work, land, or information from government.')} (${language.name})',
-                  style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                PageIntro(
+                  title: context.tr('Ask about your rights'),
+                  subtitle: '${context.tr('Housing, work, land, or information from government.')} (${language.name})',
                 ),
                 SectionTitle(context.tr('Try one of these')),
                 Wrap(

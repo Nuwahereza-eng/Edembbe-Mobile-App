@@ -25,6 +25,7 @@ class FlowStep {
 class SituationOption {
   const SituationOption({
     required this.id,
+    required this.category,
     required this.title,
     required this.description,
     required this.icon,
@@ -35,6 +36,9 @@ class SituationOption {
   });
 
   final String id;
+
+  /// One or two words above the title, so the list can be scanned by topic.
+  final String category;
   final String title;
   final String description;
   final IconData icon;
@@ -67,8 +71,9 @@ class SituationOption {
 const List<SituationOption> situationOptions = [
   SituationOption(
     id: 'eviction',
+    category: 'Housing',
     title: 'My landlord wants me out',
-    description: 'Notice to leave, rent, deposit, locked doors.',
+    description: 'Eviction notices, rent, deposits or locked doors.',
     icon: Icons.house_outlined,
     intro: 'I rent the house or room where I live.',
     ask: 'What does the law say about my rights as a tenant, and what should I do next?',
@@ -102,8 +107,9 @@ const List<SituationOption> situationOptions = [
   ),
   SituationOption(
     id: 'work',
+    category: 'Work',
     title: 'Problem at work',
-    description: 'Unpaid wages, dismissal, contracts, unfair treatment.',
+    description: 'Unpaid wages, dismissal, contracts or unfair treatment.',
     icon: Icons.work_outline,
     intro: 'I have a problem at work.',
     ask: 'What does the law say about my rights as a worker, and what should I do next?',
@@ -129,8 +135,9 @@ const List<SituationOption> situationOptions = [
   ),
   SituationOption(
     id: 'land',
+    category: 'Land',
     title: 'Land dispute',
-    description: 'Boundaries, buying land, being told to leave land.',
+    description: 'Boundaries, land purchases or being told to leave.',
     icon: Icons.landscape_outlined,
     intro: 'I have a land problem.',
     ask: 'What does the law say about my rights to this land, and what should I do next?',
@@ -156,8 +163,9 @@ const List<SituationOption> situationOptions = [
   ),
   SituationOption(
     id: 'government',
+    category: 'Government information',
     title: 'I need information from government',
-    description: 'Ask a public office for records or documents.',
+    description: 'Request public records or official documents.',
     icon: Icons.account_balance_outlined,
     intro: 'I want information from a government office.',
     ask: 'What does the law say about my right to this information, and how do I ask for it?',
@@ -177,6 +185,7 @@ const List<SituationOption> situationOptions = [
   ),
   SituationOption(
     id: 'other',
+    category: 'Other',
     title: 'Something else',
     description: 'Tell us in your own words.',
     icon: Icons.chat_bubble_outline,

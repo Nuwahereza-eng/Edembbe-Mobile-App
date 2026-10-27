@@ -70,12 +70,19 @@ class _MainShellState extends State<MainShell> {
     if (windowClassOf(context) == WindowClass.compact) {
       return Scaffold(
         body: body,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _index,
-          onDestinationSelected: _select,
-          destinations: [
-            for (final (icon, selected, label) in destinations)
-              NavigationDestination(icon: Icon(icon), selectedIcon: Icon(selected), label: label),
+        // A hairline separates the navigation from the content scrolling above it.
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Divider(height: 1),
+            NavigationBar(
+              selectedIndex: _index,
+              onDestinationSelected: _select,
+              destinations: [
+                for (final (icon, selected, label) in destinations)
+                  NavigationDestination(icon: Icon(icon), selectedIcon: Icon(selected), label: label),
+              ],
+            ),
           ],
         ),
       );

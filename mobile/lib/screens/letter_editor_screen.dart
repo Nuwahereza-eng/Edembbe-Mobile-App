@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../models/records.dart';
 import '../services/api_client.dart';
 import '../services/app_state.dart';
+import '../theme.dart';
 import '../widgets/disclaimer_footer.dart';
 import '../widgets/layout.dart';
 import '../widgets/loading_panel.dart';
@@ -179,6 +180,7 @@ class _LetterEditorScreenState extends State<LetterEditorScreen> {
       if (_unverified.isNotEmpty)
         Card.filled(
           color: scheme.errorContainer,
+          shape: kTintedCardShape,
           child: ListTile(
             leading: Icon(Icons.warning_amber_rounded, color: scheme.onErrorContainer),
             textColor: scheme.onErrorContainer,
